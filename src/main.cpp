@@ -122,6 +122,7 @@ void setup()
   pinMode(powerLED, OUTPUT); // Green LED
   pinMode(bleLED, OUTPUT);   // Blue LED
   pinMode(errorLED, OUTPUT); // Red LED
+  pinMode(potPin, INPUT);
 
   /* Set up battery monitoring */
   battery.begin(3300, 1.43, &sigmoidal);
@@ -196,6 +197,8 @@ void setup()
 
 void loop()
 {
+  // Serial.print("Vane pin: ");
+  // Serial.println(analogRead(potPin));
   webSocket.loop();
   if (battery.level() < 20)
   {
