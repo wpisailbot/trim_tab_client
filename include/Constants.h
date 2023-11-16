@@ -30,7 +30,7 @@ const int MAX_LIFT_ANGLE = 30;
 
 /* Pins */
 const int potPin = A0;              //A19
-const int batteryPin = 17;          //Battery V+
+const int batteryPin = 36;          //Battery V+
 const int servoPin = 16;            //Servo
 const int errorLED = 4;             //red
 const int bleLED = 3;               //blue

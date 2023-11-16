@@ -10,14 +10,14 @@
 #endif
 
 /* Enum definitions */
-typedef enum __TrimState_TRIM_STATE {
-    _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_LIFT_PORT = 0,
-    _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_LIFT_STBD = 1,
-    _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_DRAG_PORT = 2,
-    _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_DRAG_STBD = 3,
-    _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MIN_LIFT = 4,
-    _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MANUAL = 5
-} _TrimState_TRIM_STATE;
+typedef enum _TRIM_STATE {
+    TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT = 0,
+    TRIM_STATE_TRIM_STATE_MAX_LIFT_STBD = 1,
+    TRIM_STATE_TRIM_STATE_MAX_DRAG_PORT = 2,
+    TRIM_STATE_TRIM_STATE_MAX_DRAG_STBD = 3,
+    TRIM_STATE_TRIM_STATE_MIN_LIFT = 4,
+    TRIM_STATE_TRIM_STATE_MANUAL = 5
+} TRIM_STATE;
 
 typedef enum _CONTROL_MESSAGE_CONTROL_TYPE {
     CONTROL_MESSAGE_CONTROL_TYPE_CONTROL_MESSAGE_CONTROL_TYPE_STATE = 0,
@@ -32,7 +32,7 @@ typedef struct _DataMessage {
 
 typedef struct _ControlMessage {
     CONTROL_MESSAGE_CONTROL_TYPE control_type;
-    _TrimState_TRIM_STATE state;
+    TRIM_STATE state;
     uint32_t control_angle;
 } ControlMessage;
 
@@ -42,9 +42,9 @@ extern "C" {
 #endif
 
 /* Helper constants for enums */
-#define __TrimState_TRIM_STATE_MIN _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_LIFT_PORT
-#define __TrimState_TRIM_STATE_MAX _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MANUAL
-#define __TrimState_TRIM_STATE_ARRAYSIZE ((_TrimState_TRIM_STATE)(_TrimState_TRIM_STATE_TrimState_TRIM_STATE_MANUAL+1))
+#define _TRIM_STATE_MIN TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT
+#define _TRIM_STATE_MAX TRIM_STATE_TRIM_STATE_MANUAL
+#define _TRIM_STATE_ARRAYSIZE ((TRIM_STATE)(TRIM_STATE_TRIM_STATE_MANUAL+1))
 
 #define _CONTROL_MESSAGE_CONTROL_TYPE_MIN CONTROL_MESSAGE_CONTROL_TYPE_CONTROL_MESSAGE_CONTROL_TYPE_STATE
 #define _CONTROL_MESSAGE_CONTROL_TYPE_MAX CONTROL_MESSAGE_CONTROL_TYPE_CONTROL_MESSAGE_CONTROL_TYPE_ANGLE
@@ -52,14 +52,14 @@ extern "C" {
 
 
 #define ControlMessage_control_type_ENUMTYPE CONTROL_MESSAGE_CONTROL_TYPE
-#define ControlMessage_state_ENUMTYPE _TrimState_TRIM_STATE
+#define ControlMessage_state_ENUMTYPE TRIM_STATE
 
 
 /* Initializer values for message structs */
 #define DataMessage_init_default                 {0, 0}
-#define ControlMessage_init_default              {_CONTROL_MESSAGE_CONTROL_TYPE_MIN, __TrimState_TRIM_STATE_MIN, 0}
+#define ControlMessage_init_default              {_CONTROL_MESSAGE_CONTROL_TYPE_MIN, _TRIM_STATE_MIN, 0}
 #define DataMessage_init_zero                    {0, 0}
-#define ControlMessage_init_zero                 {_CONTROL_MESSAGE_CONTROL_TYPE_MIN, __TrimState_TRIM_STATE_MIN, 0}
+#define ControlMessage_init_zero                 {_CONTROL_MESSAGE_CONTROL_TYPE_MIN, _TRIM_STATE_MIN, 0}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define DataMessage_windAngle_tag                1

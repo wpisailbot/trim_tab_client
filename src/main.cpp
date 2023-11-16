@@ -43,7 +43,7 @@ auto servoTimer = timer_create_default();     // Sets the servo timer function t
 Servo servo;                                  // Servo object
 volatile float windAngle = 5;                     // Mapped reading from wind direction sensor on the front of the sail
 int control_angle;                            // The current angle that the servo is set to
-_TrimState_TRIM_STATE state;                   // The variable responsible for knowing what state the trim tab is in
+TRIM_STATE state;                   // The variable responsible for knowing what state the trim tab is in
 
 bool encode_string(pb_ostream_t* stream, const pb_field_t* field, void* const* arg)
 {
@@ -106,7 +106,7 @@ void setup() {
     /* Initializing variables to initial conditions */
     ledState = LOW;                             // LED starts in off position
     control_angle = SERVO_CTR;                  // Trim tab starts off centralized
-    state = _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MIN_LIFT;      // The state is set to be in the center position or what we consider to be min lift
+    state = TRIM_STATE_TRIM_STATE_MIN_LIFT;      // The state is set to be in the center position or what we consider to be min lift
     Serial.begin(115200);
     
     /* Giving feedback that the power is on */
@@ -197,7 +197,7 @@ bool servoControl(void *)
   //  servo.write(SERVO_CTR + control_angle - 200 - 90);
 
   switch(state){
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_LIFT_PORT:
+    case TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT:
       if (MAX_LIFT_ANGLE > windAngle) {
           control_angle+=2;
       }
@@ -207,7 +207,7 @@ bool servoControl(void *)
       control_angle = min(max(control_angle,(SERVO_CTR-55)), (SERVO_CTR+55));
       servo.write(control_angle);
       break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_LIFT_STBD:
+    case TRIM_STATE_TRIM_STATE_MAX_LIFT_STBD:
       windAngle*=-1;
       if(MAX_LIFT_ANGLE > windAngle) {
           control_angle-=2;
@@ -218,16 +218,16 @@ bool servoControl(void *)
       control_angle = min(max(control_angle,(SERVO_CTR-55)), (SERVO_CTR+55));
       servo.write(control_angle);
       break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_DRAG_PORT:
+    case TRIM_STATE_TRIM_STATE_MAX_DRAG_PORT:
       servo.write(SERVO_CTR - 55);
       break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_DRAG_STBD:
+    case TRIM_STATE_TRIM_STATE_MAX_DRAG_STBD:
       servo.write(SERVO_CTR + 55);
       break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MIN_LIFT:
+    case TRIM_STATE_TRIM_STATE_MIN_LIFT:
       servo.write(SERVO_CTR);
       break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MANUAL:
+    case TRIM_STATE_TRIM_STATE_MANUAL:
       servo.write(control_angle);
       break;
     default:
@@ -261,10 +261,10 @@ bool blinkState(void *)
   }
 
   switch(state){
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_LIFT_PORT:
+    case TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT:
       digitalWrite(powerLED, ledState);
       break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_LIFT_STBD:
+    case TRIM_STATE_TRIM_STATE_MAX_LIFT_STBD:
       if (ledState == HIGH) {
         delay(100);
         digitalWrite(powerLED, LOW);
@@ -276,28 +276,8 @@ bool blinkState(void *)
         digitalWrite(powerLED, LOW);
       }
       break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_DRAG_PORT:
+    case TRIM_STATE_TRIM_STATE_MAX_DRAG_PORT:
       if (ledState == HIGH) {
-        delay(100);
-        digitalWrite(powerLED, LOW);
-        delay(100);
-        digitalWrite(powerLED, HIGH);
-        delay(100);
-        digitalWrite(powerLED, LOW);
-        delay(100);
-        digitalWrite(powerLED, HIGH);
-        delay(100);
-        digitalWrite(powerLED, LOW);
-      }else{
-        digitalWrite(powerLED, LOW);
-      }
-      break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MAX_DRAG_STBD:
-      if (ledState == HIGH) {
-        delay(100);
-        digitalWrite(powerLED, LOW);
-        delay(100);
-        digitalWrite(powerLED, HIGH);
         delay(100);
         digitalWrite(powerLED, LOW);
         delay(100);
@@ -312,7 +292,27 @@ bool blinkState(void *)
         digitalWrite(powerLED, LOW);
       }
       break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MIN_LIFT:
+    case TRIM_STATE_TRIM_STATE_MAX_DRAG_STBD:
+      if (ledState == HIGH) {
+        delay(100);
+        digitalWrite(powerLED, LOW);
+        delay(100);
+        digitalWrite(powerLED, HIGH);
+        delay(100);
+        digitalWrite(powerLED, LOW);
+        delay(100);
+        digitalWrite(powerLED, HIGH);
+        delay(100);
+        digitalWrite(powerLED, LOW);
+        delay(100);
+        digitalWrite(powerLED, HIGH);
+        delay(100);
+        digitalWrite(powerLED, LOW);
+      }else{
+        digitalWrite(powerLED, LOW);
+      }
+      break;
+    case TRIM_STATE_TRIM_STATE_MIN_LIFT:
       if (ledState == HIGH) {
         delay(100);
         digitalWrite(powerLED, LOW);
@@ -330,7 +330,7 @@ bool blinkState(void *)
         digitalWrite(powerLED, LOW);
       }
       break;
-    case _TrimState_TRIM_STATE_TrimState_TRIM_STATE_MANUAL:
+    case TRIM_STATE_TRIM_STATE_MANUAL:
       digitalWrite(powerLED, HIGH);
       break;
     default:
