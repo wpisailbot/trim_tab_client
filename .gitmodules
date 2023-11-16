@@ -1,0 +1,3 @@
+[submodule "trim_tab_messages"]
+	path = trim_tab_messages
+	url = git@github.com:wpisailbot/trim_tab_messages.git
