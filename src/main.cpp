@@ -10,7 +10,7 @@
  */
 
 #include <WiFi.h>
-#include <WebSocketsClient.h>
+#include <WebSocketsServer.h>
 #include <ESPmDNS.h>
 #include <pb_encode.h>
 #include <pb_decode.h>
@@ -28,9 +28,10 @@ Battery battery = Battery(3000, 4200, batteryPin);
 // WiFi credentials
 const char *ssid = "sailbot_trimtab_ap";
 const char *password = "sailbot123";
-String websockets_server_host = "serverip_or_name"; // Enter server adress
+const char *hostname = "sailbot-trimtab";
+// String websockets_server_host = "serverip_or_name"; // Enter server adress
 uint16_t websockets_server_port = 8080;             // Enter server port
-WebSocketsClient webSocket;
+WebSocketsServer webSocket = WebSocketsServer(websockets_server_port, hostname);
 
 /* Control variables */
 volatile int ledState;                    // For controlling the state of an LED
@@ -68,11 +69,11 @@ bool SendData(void *)
   status = pb_encode(&stream, &DataMessage_msg, &message);
   message_length = stream.bytes_written;
   Serial.printf("Sending BIN\n");
-  webSocket.sendBIN(buffer, message_length);
+  //webSocket.sendBIN(clientID, buffer, message_length);
   return true;
 }
 
-void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
 {
   switch (type)
   {
@@ -143,42 +144,45 @@ void setup()
   }
   Serial.println("\nWiFi connected");
 
-  Serial.println("Connected to Wifi, doing mDNS lookup.");
-  if (!MDNS.begin("sailbot-trimtab-esp32"))
+
+  Serial.println("Advertising mDNS");
+  if (!MDNS.begin(hostname))
   {
     Serial.println("Error starting mDNS");
     return;
   }
 
-  Serial.println("Sending mDNS query");
-  int n = MDNS.queryService("sailbot-trimtab", "tcp");
-  if (n == 0)
-  {
-    Serial.println("no services found");
-  }
-  else
-  {
-    for (int i = 0; i < n; ++i)
-    {
-      // Print details for each service found
-      Serial.print("Found service ");
-      Serial.print(MDNS.hostname(i));
-      Serial.print(" (");
-      Serial.print(MDNS.IP(i));
-      // This is not actually an error
-      // Go home IntelliSense, you're drunk
-      websockets_server_host = MDNS.IP(i).toString();
-      Serial.print(":");
-      Serial.print(MDNS.port(i));
-      websockets_server_port = MDNS.port(i);
-      Serial.println(")");
-    }
-  }
-  Serial.println("Found mDNS, Connecting to server.");
+  MDNS.addService("trimtab-server", "tcp", websockets_server_port);
+
+  // Serial.println("Sending mDNS query");
+  // int n = MDNS.queryService("sailbot-trimtab", "tcp");
+  // if (n == 0)
+  // {
+  //   Serial.println("no services found");
+  // }
+  // else
+  // {
+  //   for (int i = 0; i < n; ++i)
+  //   {
+  //     // Print details for each service found
+  //     Serial.print("Found service ");
+  //     Serial.print(MDNS.hostname(i));
+  //     Serial.print(" (");
+  //     Serial.print(MDNS.IP(i));
+  //     // This is not actually an error
+  //     // Go home IntelliSense, you're drunk
+  //     websockets_server_host = MDNS.IP(i).toString();
+  //     Serial.print(":");
+  //     Serial.print(MDNS.port(i));
+  //     websockets_server_port = MDNS.port(i);
+  //     Serial.println(")");
+  //   }
+  // }
+  //Serial.println("Found mDNS, Connecting to server.");
   // Setup WebSocket
-  webSocket.begin(websockets_server_host, websockets_server_port);
+  Serial.println("Starting websocket server");
+  webSocket.begin();
   webSocket.onEvent(webSocketEvent);
-  webSocket.setReconnectInterval(5000);
 
   /* Initializing the servo and setting it to its initial condition */
   servo.attach(servoPin);
@@ -187,7 +191,7 @@ void setup()
   /* Starting the asynchronous function calls */
   servoTimer.every(10, servoControl);
   LEDTimer.every(1000, blinkState);
-  dataTimer.every(500, SendData);
+  //dataTimer.every(500, SendData);
 }
 
 void loop()
@@ -203,7 +207,7 @@ void loop()
   }
   servoTimer.tick();
   LEDTimer.tick();
-  dataTimer.tick();
+  //dataTimer.tick();
 }
 
 /**
