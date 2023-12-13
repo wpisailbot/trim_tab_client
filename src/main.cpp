@@ -17,7 +17,7 @@
 #include <ESP32Servo.h>    // Driver code for operating servo
 #include <arduino-timer.h> // Library to handle non-blocking function calls at a set interval
 #include <Battery.h>       // Library for monitoring battery level
-
+#include <ArduinoJson.h>
 /* File containing all constants for the trim tab to operate; mainly pins and comms */
 #include "Constants.h"
 #include "messages.pb.c" // Protobuf message definitions
@@ -28,7 +28,7 @@ Battery battery = Battery(3000, 4200, batteryPin);
 // WiFi credentials
 const char *ssid = "sailbot_trimtab_ap";
 const char *password = "sailbot123";
-String websockets_server_host = "serverip_or_name"; // Enter server adress
+std::string websockets_server_host = "serverip_or_name"; // Enter server adress
 uint16_t websockets_server_port = 8080;             // Enter server port
 WebSocketsClient webSocket;
 
@@ -43,6 +43,7 @@ Servo servo;                              // Servo object
 volatile float windAngle = 5;             // Mapped reading from wind direction sensor on the front of the sail
 int control_angle;                        // The current angle that the servo is set to
 TRIM_STATE state;                         // The variable responsible for knowing what state the trim tab is in
+StaticJsonDocument<200> currentData;
 
 bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void *const *arg)
 {
@@ -54,21 +55,13 @@ bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void *const *a
   return pb_encode_string(stream, (uint8_t *)str, strlen(str));
 }
 
-bool SendData(void *)
+bool SendJson(void *)
 {
-  uint8_t buffer[128];
-  size_t message_length;
-  bool status;
-
-  DataMessage message = DataMessage_init_zero;
-  message.windAngle = windAngle;
-  message.batteryLevel = battery.level();
-
-  pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
-  status = pb_encode(&stream, &DataMessage_msg, &message);
-  message_length = stream.bytes_written;
-  Serial.printf("Sending BIN\n");
-  webSocket.sendBIN(buffer, message_length);
+  currentData["wind_angle"] = windAngle;
+  currentData["battery_level"] = battery.level();
+  std::string jsonString;
+  serializeJson(currentData, jsonString);
+  webSocket.sendTXT(jsonString.c_str(), jsonString.length());
   return true;
 }
 
@@ -165,9 +158,7 @@ void setup()
       Serial.print(MDNS.hostname(i));
       Serial.print(" (");
       Serial.print(MDNS.IP(i));
-      // This is not actually an error
-      // Go home IntelliSense, you're drunk
-      websockets_server_host = MDNS.IP(i).toString();
+      websockets_server_host = MDNS.IP(i).toString().c_str();
       Serial.print(":");
       Serial.print(MDNS.port(i));
       websockets_server_port = MDNS.port(i);
@@ -176,7 +167,7 @@ void setup()
   }
   Serial.println("Found mDNS, Connecting to server.");
   // Setup WebSocket
-  webSocket.begin(websockets_server_host, websockets_server_port);
+  webSocket.begin(websockets_server_host.c_str(), websockets_server_port);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
 
@@ -187,7 +178,7 @@ void setup()
   /* Starting the asynchronous function calls */
   servoTimer.every(10, servoControl);
   LEDTimer.every(1000, blinkState);
-  dataTimer.every(500, SendData);
+  dataTimer.every(500, SendJson);
 }
 
 void loop()
