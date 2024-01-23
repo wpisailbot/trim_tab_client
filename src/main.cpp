@@ -67,6 +67,9 @@ bool SendJson(void *)
 
 void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 {
+  String json_str;
+  DynamicJsonDocument doc(1024);
+  DeserializationError err;
   switch (type)
   {
   case WStype_DISCONNECTED:
@@ -77,6 +80,49 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     break;
   case WStype_TEXT:
     Serial.printf("[WSc] Received text: %s\n", payload);
+
+    err = deserializeJson(doc, payload);
+    if (err){
+      Serial.println("deserialization error");
+    } else {
+      if (doc.containsKey("angle")){
+        control_angle = doc["angle"].as<float>();
+        Serial.print("Control angle: ");
+        Serial.print(control_angle);
+        Serial.println("");
+
+      } if (doc.containsKey("state")){
+        String newState = doc["state"].as<String>();
+        if (newState == "min_lift"){
+          state = TRIM_STATE_TRIM_STATE_MIN_LIFT;
+          Serial.println("State: min_lift");
+        }
+        else if (newState == "max_drag_port"){
+          state = TRIM_STATE_TRIM_STATE_MAX_DRAG_PORT;
+          Serial.println("State: max_drag_port");
+        }
+        else if (newState == "max_drag_starboard"){
+          state = TRIM_STATE_TRIM_STATE_MAX_DRAG_STBD;
+          Serial.println("State: max_drag_starboard");
+        }
+        else if (newState == "max_lift_port"){
+          state = TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT;
+          Serial.println("State: max_lift_port");
+        }
+        else if (newState == "max_lift_starboard"){
+          state = TRIM_STATE_TRIM_STATE_MAX_LIFT_STBD;
+          Serial.println("State: max_lift_starboard");
+        }
+        else if (newState == "max_lift_port"){
+          state = TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT;
+          Serial.println("State: max_lift_port");
+        }
+        else if (newState == "manual"){
+          state = TRIM_STATE_TRIM_STATE_MANUAL;
+          Serial.println("State: manual");
+        }
+      }
+    }
     break;
   case WStype_BIN:
     Serial.printf("[WSc] Received binary data.\n");
