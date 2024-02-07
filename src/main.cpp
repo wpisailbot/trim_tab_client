@@ -41,7 +41,7 @@ auto servoTimer = timer_create_default(); // Sets the servo timer function to be
 auto dataTimer = timer_create_default(); // Sets the data timer function to be called asynchronously on an interval
 Servo servo;                              // Servo object
 volatile float windAngle = 5;             // Mapped reading from wind direction sensor on the front of the sail
-int control_angle;                        // The current angle that the servo is set to
+int control_angle = 0;                        // The current angle that the servo is set to
 TRIM_STATE state;                         // The variable responsible for knowing what state the trim tab is in
 StaticJsonDocument<200> currentData;
 
@@ -173,6 +173,11 @@ void setup()
   /* Giving feedback that the power is on */
   digitalWrite(powerLED, HIGH);
 
+  /* Initializing the servo and setting it to its initial condition */
+  servo.attach(servoPin);
+  servo.write(control_angle);
+  Serial.println("moving servo");
+
   // Connect to WiFi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
@@ -216,10 +221,6 @@ void setup()
   webSocket.begin(websockets_server_host.c_str(), websockets_server_port);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
-
-  /* Initializing the servo and setting it to its initial condition */
-  servo.attach(servoPin);
-  servo.write(control_angle);
 
   /* Starting the asynchronous function calls */
   servoTimer.every(10, servoControl);
