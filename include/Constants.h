@@ -29,7 +29,7 @@ const int POT_HEADWIND = 463;
 const int MAX_LIFT_ANGLE = 30;
 
 /* Pins */
-const int potPin = A0;              //A19
+const int potPin = A4;              //A19
 const int batteryPin = 36;          //Battery V+
 const int servoPin = 13;            //Servo
 const int errorLED = 4;             //red

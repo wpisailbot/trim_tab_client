@@ -64,7 +64,7 @@ bool SendJson(void *)
   webSocket.sendTXT(jsonString.c_str(), jsonString.length());
   return true;
 }
-
+uint lastTimestamp = 0;
 void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 {
   String json_str;
@@ -85,6 +85,14 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     if (err){
       Serial.println("deserialization error");
     } else {
+      // if (doc.containsKey("timestamp")){
+      //   uint timestamp = doc["timestamp"].as<float>();
+      //   if (timestamp<lastTimestamp){
+      //     Serial.println("Skipping out-of-order command");
+      //     break;
+      //   }
+      //   lastTimestamp = timestamp;
+      // }
       if (doc.containsKey("angle")){
         control_angle = doc["angle"].as<float>();
         Serial.print("Control angle: ");
@@ -160,6 +168,7 @@ void setup()
   pinMode(powerLED, OUTPUT); // Green LED
   pinMode(bleLED, OUTPUT);   // Blue LED
   pinMode(errorLED, OUTPUT); // Red LED
+  pinMode(potPin, INPUT_PULLDOWN);
 
   /* Set up battery monitoring */
   battery.begin(3300, 1.43, &sigmoidal);
@@ -178,6 +187,32 @@ void setup()
   servo.write(control_angle);
   Serial.println("moving servo");
 
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(); // Disconnect any existing connections
+  delay(100); // Short delay after disconnect
+
+  Serial.println("Scanning for WiFi networks...");
+
+  int n = WiFi.scanNetworks(); // Start scanning for networks
+  if (n == 0) {
+    Serial.println("No networks found");
+  } else {
+    Serial.print(n);
+    Serial.println(" networks found");
+    for (int i = 0; i < n; ++i) {
+      // Print each network's SSID and RSSI
+      Serial.print(i + 1);
+      Serial.print(": ");
+      Serial.print(WiFi.SSID(i));
+      Serial.print(" (");
+      Serial.print(WiFi.RSSI(i));
+      Serial.print(" dBm)");
+      Serial.println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN)?" ":"*");
+      delay(10); // Short delay between prints
+    }
+  }
+  Serial.println("");
+
   // Connect to WiFi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
@@ -195,8 +230,8 @@ void setup()
   }
 
   Serial.println("Sending mDNS query");
-  int n = MDNS.queryService("sailbot-trimtab", "tcp");
-  if (n == 0)
+  int n_services = MDNS.queryService("sailbot-trimtab", "tcp");
+  if (n_services == 0)
   {
     Serial.println("no services found");
   }
@@ -205,6 +240,9 @@ void setup()
     for (int i = 0; i < n; ++i)
     {
       // Print details for each service found
+      if (MDNS.hostname(i) != "sailbot-trimtab-local"){
+        continue;
+      }
       Serial.print("Found service ");
       Serial.print(MDNS.hostname(i));
       Serial.print(" (");
@@ -214,6 +252,7 @@ void setup()
       Serial.print(MDNS.port(i));
       websockets_server_port = MDNS.port(i);
       Serial.println(")");
+      break;
     }
   }
   Serial.println("Found mDNS, Connecting to server.");
