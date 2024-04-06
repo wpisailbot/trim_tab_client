@@ -18,7 +18,7 @@
 #include <Arduino.h>
 
 /* Trim servo */
-const int SERVO_CTR    = 115;
+const int SERVO_CTR    = 90;
 const int SERVO_LO_LIM = SERVO_CTR-55;
 const int SERVO_HI_LIM = SERVO_CTR+55;
 

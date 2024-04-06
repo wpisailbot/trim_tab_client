@@ -12,15 +12,14 @@
 #include <WiFi.h>
 #include <WebSocketsClient.h>
 #include <ESPmDNS.h>
-#include <pb_encode.h>
-#include <pb_decode.h>
 #include <ESP32Servo.h>    // Driver code for operating servo
 #include <arduino-timer.h> // Library to handle non-blocking function calls at a set interval
 #include <Battery.h>       // Library for monitoring battery level
 #include <ArduinoJson.h>
 /* File containing all constants for the trim tab to operate; mainly pins and comms */
 #include "Constants.h"
-#include "messages.pb.c" // Protobuf message definitions
+
+enum TRIM_STATE {TRIM_STATE_MIN_LIFT, TRIM_STATE_MAX_DRAG_PORT, TRIM_STATE_MAX_DRAG_STBD, TRIM_STATE_MAX_LIFT_PORT, TRIM_STATE_MAX_LIFT_STBD, TRIM_STATE_MANUAL};
 
 /* Battery */
 Battery battery = Battery(3000, 4200, batteryPin);
@@ -45,15 +44,6 @@ int control_angle = 0;                        // The current angle that the serv
 TRIM_STATE state;                         // The variable responsible for knowing what state the trim tab is in
 StaticJsonDocument<200> currentData;
 
-bool encode_string(pb_ostream_t *stream, const pb_field_t *field, void *const *arg)
-{
-  const char *str = (const char *)(*arg);
-
-  if (!pb_encode_tag_for_field(stream, field))
-    return false;
-
-  return pb_encode_string(stream, (uint8_t *)str, strlen(str));
-}
 
 bool SendJson(void *)
 {
@@ -64,7 +54,7 @@ bool SendJson(void *)
   webSocket.sendTXT(jsonString.c_str(), jsonString.length());
   return true;
 }
-uint lastTimestamp = 0;
+float lastTimestamp = 0.0f;
 void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 {
   String json_str;
@@ -86,15 +76,21 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
       Serial.println("deserialization error");
     } else {
       // if (doc.containsKey("timestamp")){
-      //   uint timestamp = doc["timestamp"].as<float>();
+      //   float timestamp = doc["timestamp"].as<float>();
       //   if (timestamp<lastTimestamp){
-      //     Serial.println("Skipping out-of-order command");
+      //     Serial.print("Skipping out-of-order command. last timestamp: ");
+      //     Serial.println(lastTimestamp);
       //     break;
       //   }
       //   lastTimestamp = timestamp;
       // }
       if (doc.containsKey("angle")){
         control_angle = doc["angle"].as<float>();
+        if(control_angle > SERVO_HI_LIM){
+          control_angle = SERVO_HI_LIM;
+        } else if (control_angle < SERVO_LO_LIM){
+          control_angle = SERVO_LO_LIM;
+        }
         Serial.print("Control angle: ");
         Serial.print(control_angle);
         Serial.println("");
@@ -102,31 +98,31 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
       } if (doc.containsKey("state")){
         String newState = doc["state"].as<String>();
         if (newState == "min_lift"){
-          state = TRIM_STATE_TRIM_STATE_MIN_LIFT;
+          state = TRIM_STATE_MIN_LIFT;
           Serial.println("State: min_lift");
         }
         else if (newState == "max_drag_port"){
-          state = TRIM_STATE_TRIM_STATE_MAX_DRAG_PORT;
+          state = TRIM_STATE_MAX_DRAG_PORT;
           Serial.println("State: max_drag_port");
         }
         else if (newState == "max_drag_starboard"){
-          state = TRIM_STATE_TRIM_STATE_MAX_DRAG_STBD;
+          state = TRIM_STATE_MAX_DRAG_STBD;
           Serial.println("State: max_drag_starboard");
         }
         else if (newState == "max_lift_port"){
-          state = TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT;
+          state = TRIM_STATE_MAX_LIFT_PORT;
           Serial.println("State: max_lift_port");
         }
         else if (newState == "max_lift_starboard"){
-          state = TRIM_STATE_TRIM_STATE_MAX_LIFT_STBD;
+          state = TRIM_STATE_MAX_LIFT_STBD;
           Serial.println("State: max_lift_starboard");
         }
         else if (newState == "max_lift_port"){
-          state = TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT;
+          state = TRIM_STATE_MAX_LIFT_PORT;
           Serial.println("State: max_lift_port");
         }
         else if (newState == "manual"){
-          state = TRIM_STATE_TRIM_STATE_MANUAL;
+          state = TRIM_STATE_MANUAL;
           Serial.println("State: manual");
         }
       }
@@ -134,27 +130,6 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     break;
   case WStype_BIN:
     Serial.printf("[WSc] Received binary data.\n");
-    ControlMessage message = ControlMessage_init_zero;
-    pb_istream_t stream = pb_istream_from_buffer(payload, length);
-    bool status = pb_decode(&stream, ControlMessage_fields, &message);
-    if (!status)
-    {
-      Serial.printf("Decoding failed: %s\n", PB_GET_ERROR(&stream));
-      return;
-    }
-    switch (message.control_type)
-    {
-    case CONTROL_MESSAGE_CONTROL_TYPE_CONTROL_MESSAGE_CONTROL_TYPE_STATE:
-      state = message.state;
-      Serial.print("State: ");
-      Serial.println(state);
-      break;
-    case CONTROL_MESSAGE_CONTROL_TYPE_CONTROL_MESSAGE_CONTROL_TYPE_ANGLE:
-      control_angle = message.control_angle;
-      Serial.print("Received angle: ");
-      Serial.println(control_angle);
-      break;
-    }
     break;
   }
 }
@@ -174,7 +149,7 @@ void setup()
   /* Initializing variables to initial conditions */
   ledState = LOW;                         // LED starts in off position
   control_angle = SERVO_CTR;              // Trim tab starts off centralized
-  state = TRIM_STATE_TRIM_STATE_MIN_LIFT; // The state is set to be in the center position or what we consider to be min lift
+  state = TRIM_STATE_MIN_LIFT; // The state is set to be in the center position or what we consider to be min lift
   Serial.begin(115200);
   /* Giving feedback that the power is on */
   digitalWrite(powerLED, HIGH);
@@ -299,7 +274,7 @@ bool servoControl(void *)
 
   switch (state)
   {
-  case TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT:
+  case TRIM_STATE_MAX_LIFT_PORT:
     if (MAX_LIFT_ANGLE > windAngle)
     {
       control_angle += 2;
@@ -310,8 +285,9 @@ bool servoControl(void *)
     }
     control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55));
     servo.write(control_angle);
+    //Serial.println("Max lift port");
     break;
-  case TRIM_STATE_TRIM_STATE_MAX_LIFT_STBD:
+  case TRIM_STATE_MAX_LIFT_STBD:
     windAngle *= -1;
     if (MAX_LIFT_ANGLE > windAngle)
     {
@@ -323,17 +299,21 @@ bool servoControl(void *)
     }
     control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55));
     servo.write(control_angle);
+    //Serial.println("Max lift stbd");
     break;
-  case TRIM_STATE_TRIM_STATE_MAX_DRAG_PORT:
+  case TRIM_STATE_MAX_DRAG_PORT:
     servo.write(SERVO_CTR - 55);
+    //Serial.println("Max drag port");
     break;
-  case TRIM_STATE_TRIM_STATE_MAX_DRAG_STBD:
+  case TRIM_STATE_MAX_DRAG_STBD:
     servo.write(SERVO_CTR + 55);
+    //Serial.println("Max drag stbd");
     break;
-  case TRIM_STATE_TRIM_STATE_MIN_LIFT:
+  case TRIM_STATE_MIN_LIFT:
     servo.write(SERVO_CTR);
+    //Serial.println("Min lift");
     break;
-  case TRIM_STATE_TRIM_STATE_MANUAL:
+  case TRIM_STATE_MANUAL:
     servo.write(control_angle);
     break;
   default:
