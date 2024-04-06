@@ -160,7 +160,6 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 }
 
 bool servoControl(void *);
-bool blinkState(void *);
 
 void setup()
 {
@@ -172,16 +171,13 @@ void setup()
 
   /* Set up battery monitoring */
   battery.begin(3300, 1.43, &sigmoidal);
-
   /* Initializing variables to initial conditions */
   ledState = LOW;                         // LED starts in off position
   control_angle = SERVO_CTR;              // Trim tab starts off centralized
   state = TRIM_STATE_TRIM_STATE_MIN_LIFT; // The state is set to be in the center position or what we consider to be min lift
   Serial.begin(115200);
-
   /* Giving feedback that the power is on */
   digitalWrite(powerLED, HIGH);
-
   /* Initializing the servo and setting it to its initial condition */
   servo.attach(servoPin);
   servo.write(control_angle);
@@ -263,7 +259,6 @@ void setup()
 
   /* Starting the asynchronous function calls */
   servoTimer.every(10, servoControl);
-  LEDTimer.every(1000, blinkState);
   dataTimer.every(500, SendJson);
 }
 
@@ -292,12 +287,7 @@ bool servoControl(void *)
 {
   // Read, format, and scale angle of attack reading from the encoder
   windAngle = analogRead(potPin) - POT_HEADWIND;                                            // reads angle of attack data and centers values on headwind
-  windAngle = windAngle < 0 ? POT_HEADWIND + windAngle + (1023 - POT_HEADWIND) : windAngle; // wraps angle around
-  windAngle = windAngle / 1023.0 * 360.0;                                                   // Convert to degrees, positive when wind from 0-180, negative when wind 180-359
-  if (windAngle > 180)
-  {
-    windAngle = (360 - windAngle) * -1;
-  }
+  windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
   // Serial.println(windAngle);
 
   // Set debug LEDs to on to indicate servo control is active
@@ -348,126 +338,6 @@ bool servoControl(void *)
     break;
   default:
     servo.write(control_angle);
-    break;
-  }
-
-  return true;
-}
-
-/**
- * @author Irina Lavryonova
- * @author Tom Nurse
- * @brief controls the blinking operations within the LEDS
- */
-bool blinkState(void *)
-{
-  // Toggle state
-  ledState = ledState == LOW ? HIGH : LOW;
-
-  digitalWrite(powerLED, HIGH);
-
-  if (batteryWarning)
-  {
-    digitalWrite(errorLED, HIGH);
-  }
-
-  if (bleConnected)
-  {
-    digitalWrite(bleLED, ledState);
-  }
-  else
-  {
-    digitalWrite(bleLED, LOW);
-  }
-
-  switch (state)
-  {
-  case TRIM_STATE_TRIM_STATE_MAX_LIFT_PORT:
-    digitalWrite(powerLED, ledState);
-    break;
-  case TRIM_STATE_TRIM_STATE_MAX_LIFT_STBD:
-    if (ledState == HIGH)
-    {
-      delay(100);
-      digitalWrite(powerLED, LOW);
-      delay(100);
-      digitalWrite(powerLED, HIGH);
-      delay(100);
-      digitalWrite(powerLED, LOW);
-    }
-    else
-    {
-      digitalWrite(powerLED, LOW);
-    }
-    break;
-  case TRIM_STATE_TRIM_STATE_MAX_DRAG_PORT:
-    if (ledState == HIGH)
-    {
-      delay(100);
-      digitalWrite(powerLED, LOW);
-      delay(100);
-      digitalWrite(powerLED, HIGH);
-      delay(100);
-      digitalWrite(powerLED, LOW);
-      delay(100);
-      digitalWrite(powerLED, HIGH);
-      delay(100);
-      digitalWrite(powerLED, LOW);
-    }
-    else
-    {
-      digitalWrite(powerLED, LOW);
-    }
-    break;
-  case TRIM_STATE_TRIM_STATE_MAX_DRAG_STBD:
-    if (ledState == HIGH)
-    {
-      delay(100);
-      digitalWrite(powerLED, LOW);
-      delay(100);
-      digitalWrite(powerLED, HIGH);
-      delay(100);
-      digitalWrite(powerLED, LOW);
-      delay(100);
-      digitalWrite(powerLED, HIGH);
-      delay(100);
-      digitalWrite(powerLED, LOW);
-      delay(100);
-      digitalWrite(powerLED, HIGH);
-      delay(100);
-      digitalWrite(powerLED, LOW);
-    }
-    else
-    {
-      digitalWrite(powerLED, LOW);
-    }
-    break;
-  case TRIM_STATE_TRIM_STATE_MIN_LIFT:
-    if (ledState == HIGH)
-    {
-      delay(100);
-      digitalWrite(powerLED, LOW);
-      delay(100);
-      digitalWrite(powerLED, HIGH);
-      delay(100);
-      digitalWrite(powerLED, LOW);
-    }
-    else
-    {
-      digitalWrite(powerLED, HIGH);
-      delay(100);
-      digitalWrite(powerLED, LOW);
-      delay(100);
-      digitalWrite(powerLED, HIGH);
-      delay(100);
-      digitalWrite(powerLED, LOW);
-    }
-    break;
-  case TRIM_STATE_TRIM_STATE_MANUAL:
-    digitalWrite(powerLED, HIGH);
-    break;
-  default:
-    // Water is wet
     break;
   }
 
