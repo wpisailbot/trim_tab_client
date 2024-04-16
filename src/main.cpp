@@ -46,7 +46,7 @@ StaticJsonDocument<200> currentData;
 
 float trimTabRollScale = 1.0; // roll-controlled trimtab setpoint scale. If we're rolled too much, we want a lower AOA.
 
-float windAngles[100];
+float windAngles[NUM_WIND_READINGS];
 int windIndex = 0;
 int maxI = 0;
 volatile float currentWindAngle = 0;
@@ -54,7 +54,7 @@ bool readWind(void *){
   float windAngle = analogRead(potPin) - POT_HEADWIND;                                            // reads angle of attack data and centers values on headwind
   windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
   windAngles[windIndex] = windAngle;
-  if (maxI<99){
+  if (maxI<NUM_WIND_READINGS-1){
     maxI++;
   }
   int sum = 0;
@@ -65,7 +65,7 @@ bool readWind(void *){
   currentWindAngle = sum;
 
   windIndex++;
-  windIndex%=100;
+  windIndex%=NUM_WIND_READINGS;
   return true;
 }
 bool SendJson(void *)
@@ -154,6 +154,11 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         float currentRollMagnitude = abs(currentRoll)-20; // Don't scale until after 20 degrees roll
         trimTabRollScale = -0.05*currentRollMagnitude+1; // Inverse linear scaling from 20-40 degrees of roll
         trimTabRollScale = min(max(trimTabRollScale, 0.0f), 1.0f); //bound 0->1
+      } if (doc.containsKey("clear_winds")){
+        float lastAngle = windAngles[windIndex];
+        maxI = 1;
+        windIndex = 0;
+        windAngles[0]=lastAngle;
       }
     }
     break;
