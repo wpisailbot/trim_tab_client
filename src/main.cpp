@@ -45,13 +45,14 @@ TRIM_STATE state;                         // The variable responsible for knowin
 StaticJsonDocument<200> currentData;
 
 float trimTabRollScale = 1.0; // roll-controlled trimtab setpoint scale. If we're rolled too much, we want a lower AOA.
+unsigned long lastRollTime = 0;
 
 float windAngles[NUM_WIND_READINGS];
 int windIndex = 0;
 int maxI = 0;
 volatile float currentWindAngle = 0;
 bool readWind(void *){
-  float windAngle = analogRead(potPin) - POT_HEADWIND;                                            // reads angle of attack data and centers values on headwind
+  float windAngle = analogRead(potPin) - POT_HEADWIND; // reads angle of attack data and centers values on headwind
   windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
   windAngles[windIndex] = windAngle;
   if (maxI<NUM_WIND_READINGS-1){
@@ -150,10 +151,29 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         }
       }
       if (doc.containsKey("roll")){
+        unsigned long current_time = millis();
+        //Only take roll data every 500ms
+        if(current_time-lastRollTime<500){
+          break;
+        }
+        lastRollTime = current_time;
+        
         float currentRoll = doc["roll"].as<float>();
         float currentRollMagnitude = abs(currentRoll)-20; // Don't scale until after 20 degrees roll
-        trimTabRollScale = -0.05*currentRollMagnitude+1; // Inverse linear scaling from 20-40 degrees of roll
-        trimTabRollScale = min(max(trimTabRollScale, 0.0f), 1.0f); //bound 0->1
+        if(currentRollMagnitude>0.0){
+          trimTabRollScale-=0.1;
+          //don't invert the tab
+          if(trimTabRollScale<0.0){
+            trimTabRollScale = 0.0;
+          }
+        } else {
+          trimTabRollScale += 0.1;
+          if(trimTabRollScale>1.0){
+            trimTabRollScale = 1.0;
+          }
+        }
+        // trimTabRollScale = -0.05*currentRollMagnitude+1; // Inverse linear scaling from 20-40 degrees of roll
+        // trimTabRollScale = min(max(trimTabRollScale, 0.0f), 1.0f); //bound 0->1
       } if (doc.containsKey("clear_winds")){
         float lastAngle = windAngles[windIndex];
         maxI = 1;
@@ -286,6 +306,7 @@ void loop()
   servoTimer.tick();
   LEDTimer.tick();
   dataTimer.tick();
+  vaneTimer.tick();
 }
 
 /**
@@ -310,15 +331,24 @@ bool servoControl(void *)
   switch (state)
   {
   case TRIM_STATE_MAX_LIFT_PORT:
+    //Serial.print("Current wind: ");
+    //Serial.println(currentWindAngle);   
     if (MAX_LIFT_ANGLE > currentWindAngle)
     {
+      //Serial.print("Increasing angle ");
       control_angle += 2;
     }
     else if ((MAX_LIFT_ANGLE < currentWindAngle))
     {
+      //Serial.print("Decreasing angle ");
       control_angle -= 2;
     }
     control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
+    // Serial.print("Trimtab roll scale:");
+    // Serial.println(trimTabRollScale);
+
+    // Serial.print("Control angle: ");
+    // Serial.println(control_angle);
     servo.write(control_angle);
     //Serial.println("Max lift port");
     break;
