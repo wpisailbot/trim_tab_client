@@ -39,6 +39,8 @@ const int powerLED = 5;             //green
 #define POT_MAX 890
 #define POT_MIN -830    
 
-#define NUM_WIND_READINGS 50
+#define NUM_WIND_READINGS 20
+
+#define TRIM_ADJUST_INTERVAL_MS 200
 
 #endif

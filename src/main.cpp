@@ -41,6 +41,7 @@ auto dataTimer = timer_create_default(); // Sets the data timer function to be c
 auto vaneTimer = timer_create_default();
 Servo servo;                              // Servo object            // Mapped reading from wind direction sensor on the front of the sail
 int control_angle = 0;                        // The current angle that the servo is set to
+unsigned long lastTrimAdjustTime = 0;
 TRIM_STATE state;                         // The variable responsible for knowing what state the trim tab is in
 StaticJsonDocument<200> currentData;
 
@@ -159,7 +160,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         lastRollTime = current_time;
         
         float currentRoll = doc["roll"].as<float>();
-        float currentRollMagnitude = abs(currentRoll)-20; // Don't scale until after 20 degrees roll
+        float currentRollMagnitude = abs(currentRoll)-30; // Don't scale until after 30 degrees roll
         if(currentRollMagnitude>0.0){
           trimTabRollScale-=0.1;
           //don't invert the tab
@@ -174,11 +175,13 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         }
         // trimTabRollScale = -0.05*currentRollMagnitude+1; // Inverse linear scaling from 20-40 degrees of roll
         // trimTabRollScale = min(max(trimTabRollScale, 0.0f), 1.0f); //bound 0->1
-      } if (doc.containsKey("clear_winds")){
+      } if (doc.containsKey("clear_winds")){ // used for tacking
         float lastAngle = windAngles[windIndex];
         maxI = 1;
         windIndex = 0;
         windAngles[0]=lastAngle;
+        int current_control = SERVO_CTR-control_angle;
+        control_angle = SERVO_CTR+(current_control*-1.0);
       }
     }
     break;
@@ -330,41 +333,57 @@ bool servoControl(void *)
 
   switch (state)
   {
-  case TRIM_STATE_MAX_LIFT_PORT:
-    //Serial.print("Current wind: ");
-    //Serial.println(currentWindAngle);   
-    if (MAX_LIFT_ANGLE > currentWindAngle)
-    {
-      //Serial.print("Increasing angle ");
-      control_angle += 2;
-    }
-    else if ((MAX_LIFT_ANGLE < currentWindAngle))
-    {
-      //Serial.print("Decreasing angle ");
-      control_angle -= 2;
-    }
-    control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
-    // Serial.print("Trimtab roll scale:");
-    // Serial.println(trimTabRollScale);
+  case TRIM_STATE_MAX_LIFT_PORT: {
+      Serial.print("Current wind: ");
+      Serial.print(currentWindAngle);   
+      unsigned long currentTime = millis();
+      if(currentTime-lastTrimAdjustTime>TRIM_ADJUST_INTERVAL_MS){
+        lastTrimAdjustTime = currentTime;
+        if (MAX_LIFT_ANGLE > currentWindAngle)
+        {
+          Serial.print("Increasing angle ");
+          control_angle += 2;
+        }
+        else if ((MAX_LIFT_ANGLE < currentWindAngle))
+        {
+          Serial.println("Decreasing angle ");
+          control_angle -= 2;
+          if(control_angle<SERVO_CTR+10){
+            control_angle = SERVO_CTR+10;
+          }
+        }
+      }
+      int current_control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
+      // Serial.print("Trimtab roll scale:");
+      // Serial.println(trimTabRollScale);
 
-    // Serial.print("Control angle: ");
-    // Serial.println(control_angle);
-    servo.write(control_angle);
-    //Serial.println("Max lift port");
+      // Serial.print("Control angle: ");
+      // Serial.println(control_angle);
+      servo.write(current_control_angle);
+      //Serial.println("Max lift port");
+    }
     break;
-  case TRIM_STATE_MAX_LIFT_STBD:
-    currentWindAngle *= -1;
-    if (MAX_LIFT_ANGLE > currentWindAngle)
-    {
-      control_angle -= 2;
+  case TRIM_STATE_MAX_LIFT_STBD: {
+      float windAngleInverse = currentWindAngle *= -1;
+      unsigned long currentTime = millis();
+      if(currentTime-lastTrimAdjustTime>TRIM_ADJUST_INTERVAL_MS){
+        lastTrimAdjustTime = currentTime;
+        if (MAX_LIFT_ANGLE > windAngleInverse)
+        {
+          control_angle -= 2;
+        }
+        else if ((MAX_LIFT_ANGLE < windAngleInverse))
+        {
+          control_angle += 2;
+          if(control_angle>SERVO_CTR-10){
+            control_angle = SERVO_CTR-10;
+          }
+        }
+      }
+      int current_control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
+      servo.write(current_control_angle);
+      //Serial.println("Max lift stbd");
     }
-    else if ((MAX_LIFT_ANGLE < currentWindAngle))
-    {
-      control_angle += 2;
-    }
-    control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
-    servo.write(control_angle);
-    //Serial.println("Max lift stbd");
     break;
   case TRIM_STATE_MAX_DRAG_PORT:
     servo.write((SERVO_CTR - 55)*trimTabRollScale);
