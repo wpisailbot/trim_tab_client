@@ -180,7 +180,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         maxI = 1;
         windIndex = 0;
         windAngles[0]=lastAngle;
-        int current_control = SERVO_CTR-control_angle;
+        int current_control = control_angle-SERVO_CTR;
         control_angle = SERVO_CTR+(current_control*-1.0);
       }
     }
@@ -214,6 +214,13 @@ void setup()
   servo.attach(servoPin);
   servo.write(control_angle);
   Serial.println("moving servo");
+
+  // For recalibration
+  // while(true){
+  //   float windAngle = analogRead(potPin) - POT_HEADWIND; // reads angle of attack data and centers values on headwind
+  //   windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
+  //   Serial.println(windAngle);
+  // }
 
   WiFi.mode(WIFI_STA);
   WiFi.disconnect(); // Disconnect any existing connections
