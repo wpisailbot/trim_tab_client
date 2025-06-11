@@ -53,21 +53,25 @@ int windIndex = 0;
 int maxI = 0;
 volatile float currentWindAngle = 0;
 bool readWind(void *){
-  float windAngle = analogRead(potPin) - POT_HEADWIND; // reads angle of attack data and centers values on headwind
-  windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
+  float windAngle = analogRead(potPin) / POT_TICKS_PER_DEGREE; //- POT_HEADWIND; // reads angle of attack data and centers values on headwind
+  windAngle -= 180;
+  //Serial.println(windAngle);
+
+  //windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
   windAngles[windIndex] = windAngle;
   if (maxI<NUM_WIND_READINGS-1){
     maxI++;
   }
-  int sum = 0;
-  for(int i=0; i<maxI; i++){
+  float sum = 0;
+  for(unsigned int i=0; i<maxI; i++){
     sum += windAngles[i];
   }
   sum /= maxI;
   currentWindAngle = sum;
+  //Serial.println(currentWindAngle);
 
   windIndex++;
-  windIndex%=NUM_WIND_READINGS;
+  windIndex%=NUM_WIND_READINGS-1;
   return true;
 }
 bool SendJson(void *)
@@ -175,9 +179,10 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         }
         // trimTabRollScale = -0.05*currentRollMagnitude+1; // Inverse linear scaling from 20-40 degrees of roll
         // trimTabRollScale = min(max(trimTabRollScale, 0.0f), 1.0f); //bound 0->1
-      } if (doc.containsKey("clear_winds")){ // used for tacking
+      } 
+      if (doc.containsKey("clear_winds")){ // used for tacking
         float lastAngle = windAngles[windIndex];
-        maxI = 1;
+        maxI = 0;
         windIndex = 0;
         windAngles[0]=lastAngle;
         int current_control = control_angle-SERVO_CTR;
@@ -350,6 +355,9 @@ bool servoControl(void *)
         {
           Serial.print("Increasing angle ");
           control_angle += 2;
+          if(control_angle>SERVO_HI_LIM){
+            control_angle = SERVO_HI_LIM;
+          }
         }
         else if ((MAX_LIFT_ANGLE < currentWindAngle))
         {
@@ -378,6 +386,9 @@ bool servoControl(void *)
         if (MAX_LIFT_ANGLE > windAngleInverse)
         {
           control_angle -= 2;
+          if(control_angle<SERVO_LO_LIM){
+            control_angle = SERVO_LO_LIM;
+          }
         }
         else if ((MAX_LIFT_ANGLE < windAngleInverse))
         {
