@@ -18,6 +18,15 @@
 #include <ArduinoJson.h>
 /* File containing all constants for the trim tab to operate; mainly pins and comms */
 #include "Constants.h"
+#include <FastLED.h>
+
+// LED setup
+#define LED_DATA_PIN 13
+#define NUM_LEDS 149
+#define LED_TYPE WS2812B
+#define COLOR_ORDER GRB
+
+CRGB leds[NUM_LEDS];
 
 enum TRIM_STATE {TRIM_STATE_MIN_LIFT, TRIM_STATE_MAX_DRAG_PORT, TRIM_STATE_MAX_DRAG_STBD, TRIM_STATE_MAX_LIFT_PORT, TRIM_STATE_MAX_LIFT_STBD, TRIM_STATE_MANUAL};
 
@@ -196,6 +205,115 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
   }
 }
 
+// LED helper functions
+static int middleIndex() {
+  return NUM_LEDS / 2;
+}
+
+static void setSectionSolid(int sectionIndex, const CRGB &color) {
+  const int mid = middleIndex();
+  if (sectionIndex < 0 || sectionIndex > 5) {
+    return;
+  }
+
+  const int totalHalf = (NUM_LEDS - 1) / 2;
+  const int baseHalves[5] = {13, 13, 13, 14, 14};
+  int sumBase = 0;
+  for (int i = 0; i < 5; i++) {
+    sumBase += baseHalves[i];
+  }
+  const int remainingHalf = max(0, totalHalf - sumBase);
+  const int halfHeights[6] = {13, 13, 13, 14, 14, remainingHalf};
+
+  if (halfHeights[sectionIndex] == 0) {
+    return;
+  }
+  int offset = 0;
+  for (int i = 0; i < sectionIndex; i++) {
+    offset += halfHeights[i];
+  }
+
+  if (sectionIndex == 0) {
+    const int leftStart = max(0, mid - halfHeights[0]);
+    const int leftEnd = max(0, mid - 1);
+    const int rightStart = min(NUM_LEDS - 1, mid + 1);
+    const int rightEnd = min(NUM_LEDS - 1, mid + halfHeights[0]);
+    for (int i = leftStart; i <= leftEnd; i++) {
+      leds[i] = color;
+    }
+    for (int i = rightStart; i <= rightEnd; i++) {
+      leds[i] = color;
+    }
+    leds[mid] = color;
+    return;
+  }
+
+  const int leftStart = max(0, mid - (offset + halfHeights[sectionIndex]));
+  const int leftEnd = max(0, mid - (offset + 1));
+  const int rightStart = min(NUM_LEDS - 1, mid + (offset + 1));
+  const int rightEnd = min(NUM_LEDS - 1, mid + (offset + halfHeights[sectionIndex]));
+
+  for (int i = leftStart; i <= leftEnd; i++) {
+    leds[i] = color;
+  }
+  for (int i = rightStart; i <= rightEnd; i++) {
+    leds[i] = color;
+  }
+}
+
+bool lightLED( void *) {
+  const CRGB defaultColors[6] = {CRGB::Red,    CRGB::Green,  CRGB::Blue,
+                                 CRGB::Yellow, CRGB::Purple, CRGB::Orange};
+                          
+  // Start with everything off so section colors are obvious.
+  fill_solid(leds, NUM_LEDS, CRGB::Black);                               
+
+  if (batteryWarning) {
+    setSectionSolid(0, CRGB::Red);
+    Serial.println("Red LED : ON, Battery level low");
+  } else {
+    setSectionSolid(0, CRGB::Black);
+    Serial.println("Red LED : OFF");
+  }
+  if (bleConnected) {
+    setSectionSolid(1, CRGB::Blue);
+    Serial.println("Blue LED : ON, Device connected");
+  } else {
+    setSectionSolid(1, CRGB::Black);
+    Serial.println("Blue LED : OFF");
+  }
+  if (1){
+    setSectionSolid(2, CRGB::Green);
+    Serial.println("Green LED : ON");
+  } else {
+    setSectionSolid(2, CRGB::Black);
+    Serial.println("Green LED : OFF");
+  }
+  if (1){
+    setSectionSolid(3, CRGB::Yellow);
+    Serial.println("Yellow LED : ON");
+  } else {
+    setSectionSolid(3, CRGB::Black);
+    Serial.println("Yellow LED : OFF");
+  }
+  if (1){
+    setSectionSolid(4, CRGB::Purple);
+    Serial.println("Purple LED : ON");
+  } else {
+    setSectionSolid(4, CRGB::Black);
+    Serial.println("Purple LED : OFF");
+  }
+  if (1){
+    setSectionSolid(5, CRGB::Orange);
+    Serial.println("Orange LED : ON");
+  } else {
+    setSectionSolid(5, CRGB::Black);
+    Serial.println("Orange LED : OFF");
+  }
+  FastLED.show();
+  return true;
+}
+
 bool servoControl(void *);
 
 void setup()
@@ -205,6 +323,11 @@ void setup()
   pinMode(bleLED, OUTPUT);   // Blue LED
   pinMode(errorLED, OUTPUT); // Red LED
   pinMode(potPin, INPUT_PULLDOWN);
+
+  // Led setup
+  Serial.println("Setting up LEDs");
+  FastLED.addLeds<LED_TYPE, LED_DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+  FastLED.setBrightness(100);
 
   /* Set up battery monitoring */
   battery.begin(3300, 1.43, &sigmoidal);
@@ -305,6 +428,7 @@ void setup()
   servoTimer.every(10, servoControl);
   dataTimer.every(500, SendJson);
   vaneTimer.every(100, readWind);
+  LEDTimer.every(100, lightLED);
 }
 
 void loop()
