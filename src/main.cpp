@@ -9,6 +9,9 @@
  * @copyright Copyright (c) 2022
  */
 
+ // white turns into black: GND
+ // green turns into white: SNG
+ // red stays red: 5V
 #include <WiFi.h>
 #include <WebSocketsClient.h>
 #include <ESPmDNS.h>
@@ -44,6 +47,15 @@ WebSocketsClient webSocket;
 volatile int ledState;                    // For controlling the state of an LED
 bool batteryWarning = false;              // If True, battery level is low (at or below 20%)
 bool bleConnected = false;                // Set to True if a device is connected
+
+// Global variables for the Jetson status messages
+bool tailscale_connected = true;
+bool found_buoy = false;
+bool launch_complete = true;
+bool trim_auto = false;
+bool rudder_auto = false;
+bool connection_status = true;
+
 auto LEDTimer = timer_create_default();   // Sets the LED timer function to be called asynchronously on an interval
 auto servoTimer = timer_create_default(); // Sets the servo timer function to be called asynchronously on an interval
 auto dataTimer = timer_create_default(); // Sets the data timer function to be called asynchronously on an interval
@@ -197,6 +209,21 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         int current_control = control_angle-SERVO_CTR;
         control_angle = SERVO_CTR+(current_control*-1.0);
       }
+      if (doc.containsKey("tailscale")){
+        tailscale_connected = doc["tailscale"].as<bool>();
+      }
+      if (doc.containsKey("found_buoy")){
+        found_buoy = doc["found_buoy"].as<bool>();
+      }
+      if (doc.containsKey("trim_auto")){
+        trim_auto = doc["trim_auto"].as<bool>();
+      }
+      if (doc.containsKey("rudder_auto")){
+        rudder_auto = doc["rudder_auto"].as<bool>();
+      }
+      if (doc.containsKey("battery_ok")){
+        connection_status = doc["battery_ok"].as<bool>();
+      }
     }
     break;
   case WStype_BIN:
@@ -270,45 +297,34 @@ bool lightLED( void *) {
 
   if (batteryWarning) {
     setSectionSolid(0, CRGB::Red);
-    Serial.println("Red LED : ON, Battery level low");
+    Serial.println(battery.level());
   } else {
     setSectionSolid(0, CRGB::Black);
-    Serial.println("Red LED : OFF");
   }
-  if (bleConnected) {
+  if (found_buoy) {
     setSectionSolid(1, CRGB::Blue);
-    Serial.println("Blue LED : ON, Device connected");
   } else {
     setSectionSolid(1, CRGB::Black);
-    Serial.println("Blue LED : OFF");
   }
-  if (1){
+  if (trim_auto){
     setSectionSolid(2, CRGB::Green);
-    Serial.println("Green LED : ON");
   } else {
     setSectionSolid(2, CRGB::Black);
-    Serial.println("Green LED : OFF");
   }
-  if (1){
+  if (rudder_auto){
     setSectionSolid(3, CRGB::Yellow);
-    Serial.println("Yellow LED : ON");
   } else {
     setSectionSolid(3, CRGB::Black);
-    Serial.println("Yellow LED : OFF");
   }
-  if (1){
+  if (tailscale_connected){
     setSectionSolid(4, CRGB::Purple);
-    Serial.println("Purple LED : ON");
   } else {
     setSectionSolid(4, CRGB::Black);
-    Serial.println("Purple LED : OFF");
   }
-  if (1){
+  if (connection_status){
     setSectionSolid(5, CRGB::Orange);
-    Serial.println("Orange LED : ON");
   } else {
     setSectionSolid(5, CRGB::Black);
-    Serial.println("Orange LED : OFF");
   }
   FastLED.show();
   return true;
@@ -428,7 +444,7 @@ void setup()
   servoTimer.every(10, servoControl);
   dataTimer.every(500, SendJson);
   vaneTimer.every(100, readWind);
-  LEDTimer.every(100, lightLED);
+  LEDTimer.every(10, lightLED);
 }
 
 void loop()
