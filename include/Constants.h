@@ -21,9 +21,12 @@
 const int SERVO_CTR    = 90;
 const int SERVO_LO_LIM = SERVO_CTR-55;
 const int SERVO_HI_LIM = SERVO_CTR+55;
+const int Amax = 0;
+const int Vmax = 15;
 
-/* Wind vane*/
-const int POT_HEADWIND = 2060;
+/* Wind vane*/ // O to 2160 
+const int POT_HEADWIND = 0;
+const int POT_TICKS_PER_DEGREE = 6;
 
 /* State angles */
 const int MAX_LIFT_ANGLE = 30;
