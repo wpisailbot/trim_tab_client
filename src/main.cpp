@@ -75,7 +75,7 @@ int windIndex = 0;
 int maxI = 0;
 volatile float currentWindAngle = 0;
 bool move_flag = false;
-int targetAngle = 0;
+int targetAngle = -1;
 int startAngle = 0;
 int t_iter = 0;
 
@@ -237,6 +237,56 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     break;
   }
 }
+float moveToProfile(float diff, float curtime) {
+    float A=Amax;
+    float Vm=Vmax;
+    if (diff < 0){
+        A=-Amax;
+        Vm=-Vmax;
+    }
+    float t_accel = Vm/A;
+    float acceldist = 0.5*A*pow(t_accel,2);
+    float halfdiff = diff/2;
+    if (t_accel > abs(halfdiff)) {
+      t_accel = pow((halfdiff/(2*A)),0.5);
+    }
+    acceldist = 0.5*A*pow(t_accel,2);
+    float dist_at_max = diff - 2*acceldist;
+    float  t_decel = t_accel+(dist_at_max/Vm);
+    float t_fin = t_accel+t_decel;
+    if (curtime > t_fin) {
+      return diff;
+    }
+    if (curtime < t_accel) {
+      return 0.5*A*pow(curtime,2);
+    } else if (curtime < t_decel) {
+      return acceldist+Vm*(curtime-t_accel);
+    } else {
+      float dist_at_decel = Vm*(curtime-t_decel)- 0.5*A*pow((curtime-t_decel),2);//x = x0 + vt + at^2
+      return acceldist+ dist_at_max+dist_at_decel;
+    }
+}
+//motion helper function
+void movementHandler(int goal_angle) {
+  if (goal_angle != targetAngle) {
+      move_flag = true;
+      t_iter=0;
+      targetAngle = goal_angle;
+      startAngle = currentAngle;
+    }else{
+      if (move_flag) {
+        int angleChange = moveToProfile(targetAngle-startAngle, t_iter);
+        currentAngle = angleChange + startAngle;
+        servo.write(currentAngle);
+        t_iter=t_iter+1;
+        if (currentAngle == targetAngle) {
+          Serial.println("DONE");
+          t_iter=0;
+          move_flag = false;
+        }
+      }
+    }
+}
 
 // LED helper functions
 static int middleIndex() {
@@ -303,7 +353,7 @@ bool lightLED( void *) {
 
   if (batteryWarning) {
     setSectionSolid(0, CRGB::Red);
-    Serial.println(battery.level());
+    //Serial.println(battery.level());
   } else {
     setSectionSolid(0, CRGB::Black);
   }
@@ -361,7 +411,10 @@ void setup()
   /* Giving feedback that the power is on */
   digitalWrite(powerLED, HIGH);
   /* Initializing the servo and setting it to its initial condition */
-  servo.attach(servoPin);
+  servo.attach(servoPin, 500 , 2500);
+  currentAngle = control_angle;
+  Serial.print("Setup Current Angle");
+  Serial.println(currentAngle);
   servo.write(control_angle);
   Serial.println("moving servo");
 
@@ -451,6 +504,19 @@ void setup()
   dataTimer.every(500, SendJson);
   vaneTimer.every(100, readWind);
   LEDTimer.every(10, lightLED);
+  
+  delay(500);
+  servo.write(SERVO_CTR+5);
+  delay(500);
+  servo.write(SERVO_CTR+10);
+  delay(500);
+  servo.write(SERVO_CTR+5);
+  delay(500);
+  control_angle = SERVO_CTR;
+  currentAngle = SERVO_CTR;
+  Serial.print("Setup Current Angle Post Warmup");
+  Serial.println(currentAngle);
+  servo.write(SERVO_CTR);
 }
 
 void loop()
@@ -520,6 +586,9 @@ bool servoControl(void *)
 
       // Serial.print("Control angle: ");
       // Serial.println(control_angle);
+      currentAngle = current_control_angle;
+      Serial.print("max lift port");
+      Serial.println(currentAngle);
       servo.write(current_control_angle);
       //Serial.println("Max lift port");
     }
@@ -545,6 +614,9 @@ bool servoControl(void *)
         }
       }
       int current_control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
+      Serial.print("Max Lift Starboard");
+      Serial.println(currentAngle);
+      currentAngle = current_control_angle;
       servo.write(current_control_angle);
       //Serial.println("Max lift stbd");
     }
@@ -565,63 +637,10 @@ bool servoControl(void *)
     movementHandler(control_angle);
     break;
   default:
-    state = TRIM_STATE_MANUAL;
+    state = TRIM_STATE_MIN_LIFT;
     Serial.println("State: manual");
     break;
   }
 
   return true;
-}
-void movementHandler(int goal_angle) {
-  if (goal_angle != targetAngle) {
-      move_flag = true;
-      t_iter=0;
-      targetAngle = goal_angle;
-      startAngle = currentAngle;
-      currentAngle = servo.read();
-    }else{
-      if (move_flag) {
-        int angleChange = moveToProfile(targetAngle-startAngle, t_iter);
-        currentAngle = angleChange + startAngle;
-        Serial.print(t_iter);
-        Serial.print(" : ");
-        Serial.println(currentAngle);
-        servo.write(currentAngle);
-        t_iter=t_iter+1;
-        if (currentAngle == targetAngle) {
-          Serial.println("DONE");
-          t_iter=0;
-          move_flag = false;
-        }
-      }
-    }
-}
-float moveToProfile(float diff, float curtime) {
-    float A=Amax;
-    float Vm=Vmax;
-    if (diff < 0){
-        A=-Amax;
-        Vm=-Vmax;
-    }
-    float t_accel = Vm/A;
-    float acceldist = 0.5*A*pow(t_accel,2);
-    float halfdiff = diff/2;
-    if (t_accel > abs(halfdiff)) {
-      t_accel = pow((halfdiff/(2*A)),0.5);
-    }
-    acceldist = 0.5*A*pow(t_accel,2);
-    float dist_at_max = diff - 2*acceldist;
-    float  t_decel = t_accel+(dist_at_max/Vm);
-    float t_fin = t_accel+t_decel;
-    if (curtime > t_fin) {
-      return diff;
-    }
-    if (curtime < t_accel) {
-      return 0.5*A*pow(curtime,2);
-    } else if (curtime < t_decel) {
-      return acceldist+Vm*(curtime-t_accel);
-    } else {
-      float dist_at_decel = Vm*(curtime-t_decel)- 0.5*A*pow((curtime-t_decel),2);//x = x0 + vt + at^2
-      return acceldist+ dist_at_max+dist_at_decel;
-    }
 }
