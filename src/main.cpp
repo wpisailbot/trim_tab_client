@@ -355,9 +355,8 @@ bool lightLED( void *) {
   // Start with everything off so section colors are obvious.
   fill_solid(leds, NUM_LEDS, CRGB::Black);                               
 
-  if (batteryWarning) {
+  if (move_flag) {
     setSectionSolid(0, CRGB::Red);
-    //Serial.println(battery.level());
   } else {
     setSectionSolid(0, CRGB::Black);
   }
