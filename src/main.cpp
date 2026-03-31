@@ -275,9 +275,13 @@ void movementHandler(int goal_angle) {
       startAngle = currentAngle;
     }else{
       if (move_flag) {
+        Serial.print(currentAngle);
+        Serial.print(" : ");
+        Serial.println(targetAngle);
         int angleChange = moveToProfile(targetAngle-startAngle, t_iter);
         currentAngle = angleChange + startAngle;
         servo.write(currentAngle);
+        Serial.println(currentAngle);
         t_iter=t_iter+1;
         if (currentAngle == targetAngle) {
           Serial.println("DONE");
@@ -412,11 +416,6 @@ void setup()
   digitalWrite(powerLED, HIGH);
   /* Initializing the servo and setting it to its initial condition */
   servo.attach(servoPin, 500 , 2500);
-  currentAngle = control_angle;
-  Serial.print("Setup Current Angle");
-  Serial.println(currentAngle);
-  servo.write(control_angle);
-  Serial.println("moving servo");
 
   // For recalibration
   // while(true){
@@ -504,7 +503,14 @@ void setup()
   dataTimer.every(500, SendJson);
   vaneTimer.every(100, readWind);
   LEDTimer.every(10, lightLED);
-  
+
+  currentAngle = control_angle;
+  Serial.print("Setup Current Angle");
+  Serial.println(currentAngle);
+  servo.write(control_angle);
+  Serial.println("moving servo");
+  delay(500);
+  servo.write(SERVO_CTR+1);
   delay(500);
   servo.write(SERVO_CTR+5);
   delay(500);
@@ -587,9 +593,9 @@ bool servoControl(void *)
       // Serial.print("Control angle: ");
       // Serial.println(control_angle);
       currentAngle = current_control_angle;
-      Serial.print("max lift port");
-      Serial.println(currentAngle);
-      servo.write(current_control_angle);
+      Serial.print("max lift port: ");
+      Serial.println(current_control_angle);
+      movementHandler(current_control_angle);
       //Serial.println("Max lift port");
     }
     break; 
@@ -614,10 +620,10 @@ bool servoControl(void *)
         }
       }
       int current_control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
-      Serial.print("Max Lift Starboard");
+      Serial.print("Max Lift Starboard: ");
       Serial.println(currentAngle);
       currentAngle = current_control_angle;
-      servo.write(current_control_angle);
+      movementHandler(current_control_angle);
       //Serial.println("Max lift stbd");
     }
     break;
