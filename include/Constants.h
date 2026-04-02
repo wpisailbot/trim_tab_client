@@ -44,6 +44,6 @@ const int powerLED = 5;             //green
 
 #define NUM_WIND_READINGS 20
 
-#define TRIM_ADJUST_INTERVAL_MS 200
+#define TRIM_ADJUST_INTERVAL_MS 100
 
 #endif

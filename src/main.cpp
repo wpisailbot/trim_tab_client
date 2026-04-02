@@ -78,6 +78,7 @@ bool move_flag = false;
 int targetAngle = -1;
 int startAngle = 0;
 int t_iter = 0;
+int light_i = 0;
 
 bool readWind(void *){
   float windAngle = analogRead(potPin) / POT_TICKS_PER_DEGREE; //- POT_HEADWIND; // reads angle of attack data and centers values on headwind
@@ -354,8 +355,7 @@ bool lightLED( void *) {
                           
   // Start with everything off so section colors are obvious.
   fill_solid(leds, NUM_LEDS, CRGB::Black);                               
-
-  if (move_flag) {
+  if (move_flag) { //eventually do one that goes from green ->yellow -> red for hull battery
     setSectionSolid(0, CRGB::Red);
   } else {
     setSectionSolid(0, CRGB::Black);
@@ -375,8 +375,11 @@ bool lightLED( void *) {
   } else {
     setSectionSolid(3, CRGB::Black);
   }
-  if (tailscale_connected){
+  if (light_i>100){
     setSectionSolid(4, CRGB::Purple);
+    if(light_i > 200) {
+      light_i = 0;
+    }
   } else {
     setSectionSolid(4, CRGB::Black);
   }
@@ -386,6 +389,7 @@ bool lightLED( void *) {
     setSectionSolid(5, CRGB::Black);
   }
   FastLED.show();
+  light_i++;
   return true;
 }
 
@@ -571,7 +575,7 @@ bool servoControl(void *)
         if (MAX_LIFT_ANGLE > currentWindAngle)
         {
           Serial.print("Increasing angle ");
-          control_angle += 2;
+          control_angle += 5;
           if(control_angle>SERVO_HI_LIM){
             control_angle = SERVO_HI_LIM;
           }
@@ -579,7 +583,7 @@ bool servoControl(void *)
         else if ((MAX_LIFT_ANGLE < currentWindAngle))
         {
           Serial.println("Decreasing angle ");
-          control_angle -= 2;
+          control_angle -= 5;
           if(control_angle<SERVO_CTR+10){
             control_angle = SERVO_CTR+10;
           }
@@ -605,14 +609,14 @@ bool servoControl(void *)
         lastTrimAdjustTime = currentTime;
         if (MAX_LIFT_ANGLE > windAngleInverse)
         {
-          control_angle -= 2;
+          control_angle -= 5;
           if(control_angle<SERVO_LO_LIM){
             control_angle = SERVO_LO_LIM;
           }
         }
         else if ((MAX_LIFT_ANGLE < windAngleInverse))
         {
-          control_angle += 2;
+          control_angle += 5;
           if(control_angle>SERVO_CTR-10){
             control_angle = SERVO_CTR-10;
           }
