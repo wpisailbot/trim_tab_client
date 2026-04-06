@@ -24,10 +24,10 @@ const int SERVO_HI_LIM = 180;
 const int Amax = 3;
 const int Vmax = 15;
 
-/* Wind vane*/ // O to 2160 
+/* Wind vane*/ // 
 const int POT_HEADWIND = 0;
-const int POT_TICKS_PER_DEGREE = 6;
-
+const int POT_TICKS_PER_DEGREE = 7.34;
+const int angle_tolerance = 5;
 /* State angles */
 const int MAX_LIFT_ANGLE = 30;
 
@@ -44,6 +44,6 @@ const int powerLED = 5;             //green
 
 #define NUM_WIND_READINGS 20
 
-#define TRIM_ADJUST_INTERVAL_MS 100
+#define TRIM_ADJUST_INTERVAL_MS 400
 
 #endif

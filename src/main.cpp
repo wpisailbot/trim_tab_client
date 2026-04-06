@@ -82,8 +82,7 @@ int light_i = 0;
 
 bool readWind(void *){
   float windAngle = analogRead(potPin) / POT_TICKS_PER_DEGREE; //- POT_HEADWIND; // reads angle of attack data and centers values on headwind
-  windAngle -= 180;
-  //Serial.println(windAngle);
+  windAngle -= 180; 
 
   //windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
   windAngles[windIndex] = windAngle;
@@ -96,6 +95,8 @@ bool readWind(void *){
   }
   sum /= maxI;
   currentWindAngle = sum;
+  // Serial.print("Current wind: ");
+  // Serial.println(currentWindAngle);
   //Serial.println(currentWindAngle);
 
   windIndex++;
@@ -504,8 +505,8 @@ void setup()
   /* Starting the asynchronous function calls */
   servoTimer.every(10, servoControl);
   dataTimer.every(500, SendJson);
-  vaneTimer.every(100, readWind);
-  LEDTimer.every(10, lightLED);
+  vaneTimer.every(10, readWind);
+  LEDTimer.every(20, lightLED);
 
   currentAngle = control_angle;
   Serial.print("Setup Current Angle");
@@ -563,30 +564,33 @@ bool servoControl(void *)
 
   // Write servo position to one read from the Arduino
   //  servo.write(SERVO_CTR + control_angle - 200 - 90);
-
   switch (state)
   {
-  case TRIM_STATE_MAX_LIFT_PORT: {
-      Serial.print("Current wind: ");
-      Serial.print(currentWindAngle);   
+  case TRIM_STATE_MAX_LIFT_STBD: {
+      float windAngleInverse = currentWindAngle * -1;
       unsigned long currentTime = millis();
       if(currentTime-lastTrimAdjustTime>TRIM_ADJUST_INTERVAL_MS){
         lastTrimAdjustTime = currentTime;
-        if (MAX_LIFT_ANGLE > currentWindAngle)
+        Serial.print("Current wind: ");
+        Serial.println(windAngleInverse); 
+        if (MAX_LIFT_ANGLE > windAngleInverse+angle_tolerance)
         {
-          Serial.print("Increasing angle ");
+          Serial.println("Increasing angle ");
           control_angle += 5;
           if(control_angle>SERVO_HI_LIM){
             control_angle = SERVO_HI_LIM;
           }
         }
-        else if ((MAX_LIFT_ANGLE < currentWindAngle))
+        else if ((MAX_LIFT_ANGLE+angle_tolerance < windAngleInverse))
         {
+          
           Serial.println("Decreasing angle ");
           control_angle -= 5;
           if(control_angle<SERVO_CTR+10){
             control_angle = SERVO_CTR+10;
           }
+        }else{
+          Serial.println("");
         }
       }
       int current_control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
@@ -596,25 +600,24 @@ bool servoControl(void *)
       // Serial.print("Control angle: ");
       // Serial.println(control_angle);
       currentAngle = current_control_angle;
-      Serial.print("max lift port: ");
-      Serial.println(current_control_angle);
       movementHandler(current_control_angle);
       //Serial.println("Max lift port");
     }
     break; 
-  case TRIM_STATE_MAX_LIFT_STBD: {
-      float windAngleInverse = currentWindAngle *= -1;
+  case TRIM_STATE_MAX_LIFT_PORT: {
       unsigned long currentTime = millis();
       if(currentTime-lastTrimAdjustTime>TRIM_ADJUST_INTERVAL_MS){
+        Serial.print("Max Lift PORT: ");
+        Serial.println(currentWindAngle); 
         lastTrimAdjustTime = currentTime;
-        if (MAX_LIFT_ANGLE > windAngleInverse)
+        if (MAX_LIFT_ANGLE > currentWindAngle+angle_tolerance)
         {
           control_angle -= 5;
           if(control_angle<SERVO_LO_LIM){
             control_angle = SERVO_LO_LIM;
           }
         }
-        else if ((MAX_LIFT_ANGLE < windAngleInverse))
+        else if ((MAX_LIFT_ANGLE+angle_tolerance < currentWindAngle))
         {
           control_angle += 5;
           if(control_angle>SERVO_CTR-10){
@@ -623,18 +626,16 @@ bool servoControl(void *)
         }
       }
       int current_control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
-      Serial.print("Max Lift Starboard: ");
-      Serial.println(currentAngle);
       currentAngle = current_control_angle;
       movementHandler(current_control_angle);
       //Serial.println("Max lift stbd");
     }
     break;
-  case TRIM_STATE_MAX_DRAG_PORT:
+  case TRIM_STATE_MAX_DRAG_STBD:
     movementHandler(SERVO_LO_LIM*trimTabRollScale);
     //Serial.println("Max drag port");
     break;
-  case TRIM_STATE_MAX_DRAG_STBD:
+  case TRIM_STATE_MAX_DRAG_PORT:
     movementHandler(SERVO_HI_LIM*trimTabRollScale);
     //Serial.println("Max drag stbd");
     break;
