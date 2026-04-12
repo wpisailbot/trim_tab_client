@@ -505,7 +505,7 @@ void setup()
   /* Starting the asynchronous function calls */
   servoTimer.every(10, servoControl);
   dataTimer.every(500, SendJson);
-  vaneTimer.every(10, readWind);
+  vaneTimer.every(100y7q1 , readWind);
   LEDTimer.every(20, lightLED);
 
   currentAngle = control_angle;
