@@ -505,8 +505,8 @@ void setup()
   /* Starting the asynchronous function calls */
   servoTimer.every(10, servoControl);
   dataTimer.every(500, SendJson);
-  vaneTimer.every(100y7q1 , readWind);
-  LEDTimer.every(20, lightLED);
+  vaneTimer.every(100, readWind);
+  LEDTimer.every(100, lightLED);
 
   currentAngle = control_angle;
   Serial.print("Setup Current Angle");
@@ -576,7 +576,7 @@ bool servoControl(void *)
         if (MAX_LIFT_ANGLE > windAngleInverse+angle_tolerance)
         {
           Serial.println("Increasing angle ");
-          control_angle += 5;
+          control_angle += 2;
           if(control_angle>SERVO_HI_LIM){
             control_angle = SERVO_HI_LIM;
           }
@@ -585,7 +585,7 @@ bool servoControl(void *)
         {
           
           Serial.println("Decreasing angle ");
-          control_angle -= 5;
+          control_angle -= 2;
           if(control_angle<SERVO_CTR+10){
             control_angle = SERVO_CTR+10;
           }
@@ -612,14 +612,14 @@ bool servoControl(void *)
         lastTrimAdjustTime = currentTime;
         if (MAX_LIFT_ANGLE > currentWindAngle+angle_tolerance)
         {
-          control_angle -= 5;
+          control_angle -= 2;
           if(control_angle<SERVO_LO_LIM){
             control_angle = SERVO_LO_LIM;
           }
         }
         else if ((MAX_LIFT_ANGLE+angle_tolerance < currentWindAngle))
         {
-          control_angle += 5;
+          control_angle += 2;
           if(control_angle>SERVO_CTR-10){
             control_angle = SERVO_CTR-10;
           }
