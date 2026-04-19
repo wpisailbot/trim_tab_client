@@ -420,6 +420,10 @@ void setup()
   digitalWrite(powerLED, HIGH);
   /* Initializing the servo and setting it to its initial condition */
   servo.attach(servoPin, 500 , 2500);
+  currentAngle = control_angle;
+  Serial.print("Setup Current Angle");
+  Serial.println(currentAngle);
+  servo.write(control_angle);
 
   // For recalibration
   // while(true){
@@ -508,10 +512,6 @@ void setup()
   vaneTimer.every(100, readWind);
   LEDTimer.every(100, lightLED);
 
-  currentAngle = control_angle;
-  Serial.print("Setup Current Angle");
-  Serial.println(currentAngle);
-  servo.write(control_angle);
   Serial.println("moving servo");
   delay(500);
   servo.write(SERVO_CTR+1);
