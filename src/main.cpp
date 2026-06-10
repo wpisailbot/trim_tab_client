@@ -372,9 +372,9 @@ bool lightLED( void *) {
     } else {
       setSectionSolid(3, CRGB::Black);
     }
-    if (light_i>100){
+    if (light_i>10){
       setSectionSolid(4, CRGB::Purple);
-      if(light_i > 200) {
+      if(light_i > 20) {
         light_i = 0;
       }
     } else {
