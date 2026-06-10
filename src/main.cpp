@@ -38,7 +38,7 @@ bool launch_complete = true;
 bool trim_auto = false;
 bool rudder_auto = false;
 bool connection_status = true;
-reach_buoy = false;
+bool reach_buoy = false;
 
 auto LEDTimer = timer_create_default();   // Sets the LED timer function to be called asynchronously on an interval
 Servo servo;                              // Servo object            // Mapped reading from wind direction sensor on the front of the sail
@@ -505,12 +505,7 @@ void setup(){
   LEDTimer.every(100, lightLED);
 
   Serial.println("moving servo");
-  delay(500);
   servo.write(SERVO_CTR+1);
-  delay(500);
-  servo.write(SERVO_CTR+5);
-  delay(500);
-  servo.write(SERVO_CTR+10);
   delay(500);
   servo.write(SERVO_CTR+5);
   delay(500);
