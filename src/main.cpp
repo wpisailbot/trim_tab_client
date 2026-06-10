@@ -9,20 +9,10 @@
  * @copyright Copyright (c) 2022
  */
 
-#include <WiFi.h>
-#include <WebSocketsClient.h>
-#include <ESPmDNS.h>
-#include <ESP32Servo.h>    // Driver code for operating servo
-#include <arduino-timer.h> // Library to handle non-blocking function calls at a set interval
-#include <Battery.h>       // Library for monitoring battery level
-#include <ArduinoJson.h>
 /* File containing all constants for the trim tab to operate; mainly pins and comms */
 #include "Constants.h"
 
 enum TRIM_STATE {TRIM_STATE_MIN_LIFT, TRIM_STATE_MAX_DRAG_PORT, TRIM_STATE_MAX_DRAG_STBD, TRIM_STATE_MAX_LIFT_PORT, TRIM_STATE_MAX_LIFT_STBD, TRIM_STATE_MANUAL};
-
-/* Battery */
-Battery battery = Battery(3000, 4200, batteryPin);
 
 // WiFi credentials
 const char *ssid = "sailbot_trimtab_ap";
@@ -33,12 +23,8 @@ WebSocketsClient webSocket;
 
 /* Control variables */
 volatile int ledState;                    // For controlling the state of an LED
-bool batteryWarning = false;              // If True, battery level is low (at or below 20%)
 bool bleConnected = false;                // Set to True if a device is connected
 auto LEDTimer = timer_create_default();   // Sets the LED timer function to be called asynchronously on an interval
-auto servoTimer = timer_create_default(); // Sets the servo timer function to be called asynchronously on an interval
-auto dataTimer = timer_create_default(); // Sets the data timer function to be called asynchronously on an interval
-auto vaneTimer = timer_create_default();
 Servo servo;                              // Servo object            // Mapped reading from wind direction sensor on the front of the sail
 int control_angle = 0;                        // The current angle that the servo is set to
 unsigned long lastTrimAdjustTime = 0;
@@ -52,7 +38,13 @@ float windAngles[NUM_WIND_READINGS];
 int windIndex = 0;
 int maxI = 0;
 volatile float currentWindAngle = 0;
-bool readWind(void *){
+
+TaskHandle_t WebSocket;
+TaskHandle_t ServoController;
+TaskHandle_t WindVaneRead;
+TaskHandle_t SenData;
+
+bool readWind(){
   float windAngle = analogRead(potPin) - POT_HEADWIND; // reads angle of attack data and centers values on headwind
   windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
   windAngles[windIndex] = windAngle;
@@ -70,18 +62,17 @@ bool readWind(void *){
   windIndex%=NUM_WIND_READINGS;
   return true;
 }
-bool SendJson(void *)
-{
+
+bool SendJson(){
   currentData["wind_angle"] = currentWindAngle;
-  currentData["battery_level"] = battery.level();
   std::string jsonString;
   serializeJson(currentData, jsonString);
   webSocket.sendTXT(jsonString.c_str(), jsonString.length());
   return true;
 }
+
 float lastTimestamp = 0.0f;
-void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
-{
+void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
   String json_str;
   DynamicJsonDocument doc(1024);
   DeserializationError err;
@@ -193,16 +184,13 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 
 bool servoControl(void *);
 
-void setup()
-{
+void setup(){
   /* Setting the mode of the pins necessary */
   pinMode(powerLED, OUTPUT); // Green LED
   pinMode(bleLED, OUTPUT);   // Blue LED
   pinMode(errorLED, OUTPUT); // Red LED
   pinMode(potPin, INPUT_PULLDOWN);
 
-  /* Set up battery monitoring */
-  battery.begin(3300, 1.43, &sigmoidal);
   /* Initializing variables to initial conditions */
   ledState = LOW;                         // LED starts in off position
   control_angle = SERVO_CTR;              // Trim tab starts off centralized
@@ -289,27 +277,73 @@ void setup()
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
 
-  /* Starting the asynchronous function calls */
-  servoTimer.every(10, servoControl);
-  dataTimer.every(500, SendJson);
-  vaneTimer.every(100, readWind);
+  xTaskCreatePinnedToCore(
+    ServoTask,   /* Task function. */
+    "Task1",     /* name of task. */
+    100000,       /* Stack size of task */
+    NULL,        /* parameter of the task */
+    10,           /* priority of the task */
+    &ServoController,      /* Task handle to keep track of created task */
+    0);          /* pin task to core 0 */   
+
+  xTaskCreatePinnedToCore(
+    WebSocketTask,   /* Task function. */
+    "Task2",     /* name of task. */
+    100000,       /* Stack size of task */
+    NULL,        /* parameter of the task */
+    9,           /* priority of the task */
+    &WebSocket,      /* Task handle to keep track of created task */
+    0);          /* pin task to core 1 */
+
+  xTaskCreatePinnedToCore(
+    VaneRead,   /* Task function. */
+    "Task2",     /* name of task. */
+    100000,       /* Stack size of task */
+    NULL,        /* parameter of the task */
+    8,           /* priority of the task */
+    &WindVaneRead,      /* Task handle to keep track of created task */
+    1); 
+
+  xTaskCreatePinnedToCore(
+    SendData,   /* Task function. */
+    "Task2",     /* name of task. */
+    100000,       /* Stack size of task */
+    NULL,        /* parameter of the task */
+    1,           /* priority of the task */
+    &SenData,      /* Task handle to keep track of created task */
+    1); 
+    
 }
 
-void loop()
-{
-  webSocket.loop();
-  if (battery.level() < 20)
-  {
-    batteryWarning = true;
+void VaneRead(void * pvParameters){
+  for(;;){
+    readWind();
+    vTaskDelay(100);
   }
-  else
-  {
-    batteryWarning = false;
+}
+
+void WebSocketTask(void * pvParameters){
+  for(;;){
+    webSocket.loop();
   }
-  servoTimer.tick();
+}
+
+void ServoTask(void * pvParameters){
+  for(;;){
+    servoControl();
+    vTaskDelay(50);
+  }
+}
+
+void SendData(void * pvParameters){
+  for(;;){
+    SendJson();
+    vTaskDelay(500);
+  }
+}
+
+void loop(){
   LEDTimer.tick();
-  dataTimer.tick();
-  vaneTimer.tick();
 }
 
 /**
@@ -318,8 +352,7 @@ void loop()
  * @TODO: send this state to the telemetry interface
  */
 
-bool servoControl(void *)
-{
+bool servoControl(){
   // Read, format, and scale angle of attack reading from the encoder
   
   // Serial.println(windAngle);

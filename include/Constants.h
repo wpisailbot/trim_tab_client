@@ -16,6 +16,14 @@
 
 // necessary libraries for the constants
 #include <Arduino.h>
+#include <WiFi.h>
+#include <WebSocketsClient.h>
+#include <ESPmDNS.h>
+#include <ESP32Servo.h>    // Driver code for operating servo
+#include <arduino-timer.h> // Library to handle non-blocking function calls at a set interval
+#include <ArduinoJson.h>
+#include "FreeRTOS.h"
+#include "task.h"
 
 /* Trim servo */
 const int SERVO_CTR    = 90;
