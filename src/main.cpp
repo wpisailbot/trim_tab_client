@@ -38,6 +38,7 @@ bool launch_complete = true;
 bool trim_auto = false;
 bool rudder_auto = false;
 bool connection_status = true;
+reach_buoy = false;
 
 auto LEDTimer = timer_create_default();   // Sets the LED timer function to be called asynchronously on an interval
 Servo servo;                              // Servo object            // Mapped reading from wind direction sensor on the front of the sail
@@ -213,9 +214,12 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
       if (doc.containsKey("rudder_auto")){
         rudder_auto = doc["rudder_auto"].as<bool>();
       }
-      // if (doc.containsKey("battery_ok")){
-      //   connection_status = doc["battery_ok"].as<bool>();
-      //}
+      if (doc.containsKey("reach_buoy")){
+        reach_buoy = doc["reach_buoy"].as<bool>();
+      }
+      if (doc.containsKey("battery_ok")){
+        connection_status = doc["battery_ok"].as<bool>();
+      }
     }
     break;
   case WStype_BIN:
@@ -339,39 +343,48 @@ bool lightLED( void *) {
                                  CRGB::Yellow, CRGB::Purple, CRGB::Orange};
                           
   // Start with everything off so section colors are obvious.
-  fill_solid(leds, NUM_LEDS, CRGB::Black);                               
-  if (move_flag) { //eventually do one that goes from green ->yellow -> red for hull battery
-    setSectionSolid(0, CRGB::Red);
-  } else {
-    setSectionSolid(0, CRGB::Black);
-  }
-  if (found_buoy) {
-    setSectionSolid(1, CRGB::Blue);
-  } else {
-    setSectionSolid(1, CRGB::Black);
-  }
-  if (trim_auto){
+  fill_solid(leds, NUM_LEDS, CRGB::Black);            
+  if(reach_buoy){
+    setSectionSolid(0, CRGB::Green);
+    setSectionSolid(1, CRGB::Green);
     setSectionSolid(2, CRGB::Green);
+    setSectionSolid(3, CRGB::Green);
+    setSectionSolid(4, CRGB::Green);
   } else {
-    setSectionSolid(2, CRGB::Black);
-  }
-  if (rudder_auto){
-    setSectionSolid(3, CRGB::Yellow);
-  } else {
-    setSectionSolid(3, CRGB::Black);
-  }
-  if (light_i>100){
-    setSectionSolid(4, CRGB::Purple);
-    if(light_i > 200) {
-      light_i = 0;
+    
+    if (move_flag) { //eventually do one that goes from green ->yellow -> red for hull battery
+      setSectionSolid(0, CRGB::Red);
+    } else {
+      setSectionSolid(0, CRGB::Black);
     }
-  } else {
-    setSectionSolid(4, CRGB::Black);
-  }
-  if (connection_status){
-    setSectionSolid(5, CRGB::Orange);
-  } else {
-    setSectionSolid(5, CRGB::Black);
+    if (found_buoy) {
+      setSectionSolid(1, CRGB::Blue);
+    } else {
+      setSectionSolid(1, CRGB::Black);
+    }
+    if (trim_auto){
+      setSectionSolid(2, CRGB::Green);
+    } else {
+      setSectionSolid(2, CRGB::Black);
+    }
+    if (rudder_auto){
+      setSectionSolid(3, CRGB::Yellow);
+    } else {
+      setSectionSolid(3, CRGB::Black);
+    }
+    if (light_i>100){
+      setSectionSolid(4, CRGB::Purple);
+      if(light_i > 200) {
+        light_i = 0;
+      }
+    } else {
+      setSectionSolid(4, CRGB::Black);
+    }
+    if (connection_status){
+      setSectionSolid(5, CRGB::Orange);
+    } else {
+      setSectionSolid(5, CRGB::Black);
+    }
   }
   FastLED.show();
   light_i++;
