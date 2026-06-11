@@ -40,6 +40,8 @@ bool rudder_auto = false;
 bool connection_status = true;
 bool reach_buoy = false;
 
+bool connection_error = false;
+
 auto LEDTimer = timer_create_default();   // Sets the LED timer function to be called asynchronously on an interval
 Servo servo;                              // Servo object            // Mapped reading from wind direction sensor on the front of the sail
 int control_angle = 0;                        // The current angle that the servo is set to
@@ -50,7 +52,7 @@ StaticJsonDocument<200> currentData;
 
 float trimTabRollScale = 1.0; // roll-controlled trimtab setpoint scale. If we're rolled too much, we want a lower AOA.
 unsigned long lastRollTime = 0;
-
+int connection_status_ind = 0;
 float windAngles[NUM_WIND_READINGS];
 int windIndex = 0;
 int maxI = 0;
@@ -344,51 +346,44 @@ bool lightLED( void *) {
                           
   // Start with everything off so section colors are obvious.
   fill_solid(leds, NUM_LEDS, CRGB::Black);            
-  if(reach_buoy){
-    setSectionSolid(0, CRGB::Green);
-    setSectionSolid(1, CRGB::Green);
-    setSectionSolid(2, CRGB::Green);
-    setSectionSolid(3, CRGB::Green);
-    setSectionSolid(4, CRGB::Green);
-  } else {
-    
+  if(light_i != 0){
+    if (connection_status && connection_status_ind == 0) {
+      connection_status_ind++;
+    } else if(!connection_status && connection_status_ind == 1) {
+      connection_status_ind++;
+    }
+  } else{
     if (move_flag) { //eventually do one that goes from green ->yellow -> red for hull battery
       setSectionSolid(0, CRGB::Red);
-    } else {
-      setSectionSolid(0, CRGB::Black);
     }
     if (found_buoy) {
       setSectionSolid(1, CRGB::Blue);
-    } else {
-      setSectionSolid(1, CRGB::Black);
     }
     if (trim_auto){
       setSectionSolid(2, CRGB::Green);
-    } else {
-      setSectionSolid(2, CRGB::Black);
     }
     if (rudder_auto){
       setSectionSolid(3, CRGB::Yellow);
-    } else {
-      setSectionSolid(3, CRGB::Black);
     }
-    if (light_i>10){
-      setSectionSolid(4, CRGB::Purple);
-      if(light_i > 20) {
-        light_i = 0;
-      }
+    
+    setSectionSolid(4, CRGB::Purple);
+
+    if (connection_status_ind == 2){
+      connection_error = false;
     } else {
-      setSectionSolid(4, CRGB::Black);
+      connection_error = true;
     }
-    if (connection_status){
-      setSectionSolid(5, CRGB::Orange);
-    } else {
-      setSectionSolid(5, CRGB::Black);
-    }
+    connection_status_ind = 0;
+  }
+  if (connection_error) {
+    setSectionSolid(5, CRGB::Orange);
   }
   FastLED.show();
   light_i++;
   return true;
+  if (light_i >= 10) {
+    light_i = 0;
+  }
 }
 
 bool servoControl();
@@ -561,7 +556,7 @@ void LEDTimerTask(void * pvParameters){
   for(;;){
     //Serial.println("websocket run");
     LEDTimer.tick();
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
 
