@@ -61,10 +61,10 @@ int startAngle = 0;
 int t_iter = 0;
 int light_i = 0;
 
-TaskHandle_t WebSocket;
+TaskHandle_t WingLEDTimer;
 TaskHandle_t ServoController;
-TaskHandle_t WindVaneRead;
-TaskHandle_t SenData;
+//TaskHandle_t WindVaneRead;
+TaskHandle_t SenData; //actually wind vane but it wouldn't let vane read work
 
 bool readWind(){
   float windAngle = analogRead(potPin) / POT_TICKS_PER_DEGREE; //- POT_HEADWIND; // reads angle of attack data and centers values on headwind
@@ -518,70 +518,72 @@ void setup(){
   xTaskCreatePinnedToCore(
     ServoTask,   /* Task function. */
     "ServoTask",     /* name of task. */
-    100000,       /* Stack size of task */
+    8000,       /* Stack size of task */
     NULL,        /* parameter of the task */
     10,           /* priority of the task */
     &ServoController,      /* Task handle to keep track of created task */
-    0);          /* pin task to core 0 */   
-
+    1);          /* pin task to core 0 */ 
   xTaskCreatePinnedToCore(
-    WebSocketTask,   /* Task function. */
-    "WebSocketTask",     /* name of task. */
-    100000,       /* Stack size of task */
+    LEDTimerTask,   /* Task function. */
+    "LEDTimerTask",     /* name of task. */
+    4000,       /* Stack size of task */
     NULL,        /* parameter of the task */
     9,           /* priority of the task */
-    &WebSocket,      /* Task handle to keep track of created task */
+    &WingLEDTimer,      /* Task handle to keep track of created task */
     0);          /* pin task to core 1 */
-
-  xTaskCreatePinnedToCore(
-    VaneRead,   /* Task function. */
-    "VaneRead",     /* name of task. */
-    100000,       /* Stack size of task */
-    NULL,        /* parameter of the task */
-    8,           /* priority of the task */
-    &WindVaneRead,      /* Task handle to keep track of created task */
-    1); 
-
-  xTaskCreatePinnedToCore(
+  // xTaskCreatePinnedToCore(
+  //   VaneRead,   /* Task function. */
+  //   "VaneRead",     /* name of task. */
+  //   10000,       /* Stack size of task */
+  //   NULL,        /* parameter of the task */
+  //   1,           /* priority of the task */
+  //   &WindVaneRead,      /* Task handle to keep track of created task */
+  //   1); 
+  xTaskCreatePinnedToCore( //actually wind vane but it wouldn't let vane read work
     SendData,   /* Task function. */
     "SendData",     /* name of task. */
-    100000,       /* Stack size of task */
+    8000,       /* Stack size of task */
     NULL,        /* parameter of the task */
-    1,           /* priority of the task */
+    2,           /* priority of the task */
     &SenData,      /* Task handle to keep track of created task */
-    1); 
-    
+    0); 
 }
 
-void VaneRead(void * pvParameters){
-  for(;;){
-    readWind();
-    vTaskDelay(100);
-  }
-}
+// void VaneRead(void * pvParameters){ //did not work
+//   Serial.println("read wind run");
+//   for(;;){
+//     readWind();
+//     vTaskDelay(pdMS_TO_TICKS(100));
+//   }
+// }
 
-void WebSocketTask(void * pvParameters){
+void LEDTimerTask(void * pvParameters){
   for(;;){
-    webSocket.loop();
+    //Serial.println("websocket run");
+    LEDTimer.tick();
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
 
 void ServoTask(void * pvParameters){
   for(;;){
     servoControl();
-    vTaskDelay(50);
+    //Serial.println("servo task run");
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
-void SendData(void * pvParameters){
+void SendData(void * pvParameters){ //actually wind vane but it wouldn't let vane read work
   for(;;){
-    SendJson();
-    vTaskDelay(500);
+    //SendJson();
+    readWind();
+    //Serial.println("send wind run");
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
 
 void loop(){
-  LEDTimer.tick();
+  webSocket.loop();
 }
 
 /**
@@ -608,12 +610,12 @@ bool servoControl(){
       unsigned long currentTime = millis();
       if(currentTime-lastTrimAdjustTime>TRIM_ADJUST_INTERVAL_MS){
         lastTrimAdjustTime = currentTime;
-        Serial.print("Current wind: ");
-        Serial.println(windAngleInverse); 
+        //Serial.print("Current wind: ");
+        //Serial.println(windAngleInverse); 
         if (MAX_LIFT_ANGLE > windAngleInverse+angle_tolerance)
         {
           Serial.println("Increasing angle ");
-          control_angle += 2;
+          control_angle += 5;
           if(control_angle>SERVO_HI_LIM){
             control_angle = SERVO_HI_LIM;
           }
@@ -622,7 +624,7 @@ bool servoControl(){
         {
           
           Serial.println("Decreasing angle ");
-          control_angle -= 2;
+          control_angle -= 5;
           if(control_angle<SERVO_CTR+10){
             control_angle = SERVO_CTR+10;
           }
@@ -637,26 +639,26 @@ bool servoControl(){
       // Serial.print("Control angle: ");
       // Serial.println(control_angle);
       currentAngle = current_control_angle;
-      movementHandler(current_control_angle);
+      servo.write(current_control_angle);
       //Serial.println("Max lift port");
     }
     break; 
   case TRIM_STATE_MAX_LIFT_PORT: {
       unsigned long currentTime = millis();
       if(currentTime-lastTrimAdjustTime>TRIM_ADJUST_INTERVAL_MS){
-        Serial.print("Max Lift PORT: ");
-        Serial.println(currentWindAngle); 
+        //Serial.print("Max Lift PORT: ");
+        //Serial.println(currentWindAngle); 
         lastTrimAdjustTime = currentTime;
         if (MAX_LIFT_ANGLE > currentWindAngle+angle_tolerance)
         {
-          control_angle -= 2;
+          control_angle -= 5;
           if(control_angle<SERVO_LO_LIM){
             control_angle = SERVO_LO_LIM;
           }
         }
         else if ((MAX_LIFT_ANGLE+angle_tolerance < currentWindAngle))
         {
-          control_angle += 2;
+          control_angle += 5;
           if(control_angle>SERVO_CTR-10){
             control_angle = SERVO_CTR-10;
           }
@@ -664,7 +666,7 @@ bool servoControl(){
       }
       int current_control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
       currentAngle = current_control_angle;
-      movementHandler(current_control_angle);
+      servo.write(current_control_angle);
       //Serial.println("Max lift stbd");
     }
     break;
@@ -681,10 +683,11 @@ bool servoControl(){
     //Serial.println("Min lift");
     break;
   case TRIM_STATE_MANUAL:
+    state = TRIM_STATE_MANUAL;
     movementHandler(control_angle);
     break;
   default:
-    state = TRIM_STATE_MIN_LIFT;
+    state = TRIM_STATE_MANUAL; 
     Serial.println("State: manual");
     break;
   }

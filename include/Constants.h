@@ -60,7 +60,7 @@ const int powerLED = 5;             //green
 #define COLOR_ORDER GRB
 
 void VaneRead(void * pvParameters);
-void WebSocketTask(void * pvParameters);
+void LEDTimerTask(void * pvParameters);
 void ServoTask(void * pvParameters);
 void SendData(void * pvParameters);
 
