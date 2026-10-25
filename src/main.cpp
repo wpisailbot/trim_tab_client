@@ -18,7 +18,6 @@
 
 CRGB leds[NUM_LEDS];
 
-enum TRIM_STATE {TRIM_STATE_MIN_LIFT, TRIM_STATE_MAX_DRAG_PORT, TRIM_STATE_MAX_DRAG_STBD, TRIM_STATE_MAX_LIFT_PORT, TRIM_STATE_MAX_LIFT_STBD, TRIM_STATE_MANUAL};
 
 // WiFi credentials
 const char *ssid = "sailbot_trimtab_ap";
@@ -28,8 +27,6 @@ uint16_t websockets_server_port = 8080;             // Enter server port
 WebSocketsClient webSocket;
 
 /* Control variables */
-volatile int ledState;                    // For controlling the state of an LED
-bool bleConnected = false;                // Set to True if a device is connected
 
 // Global variables for the Jetson status messages
 bool tailscale_connected = true;
@@ -41,24 +38,21 @@ bool connection_status = true;
 bool reach_buoy = false;
 
 auto LEDTimer = timer_create_default();   // Sets the LED timer function to be called asynchronously on an interval
-Servo servo;                              // Servo object            // Mapped reading from wind direction sensor on the front of the sail
+
 int control_angle = 0;                        // The current angle that the servo is set to
-int currentAngle = 0;
-unsigned long lastTrimAdjustTime = 0;
+
+
 TRIM_STATE state;                         // The variable responsible for knowing what state the trim tab is in
 StaticJsonDocument<200> currentData;
 
-float trimTabRollScale = 1.0; // roll-controlled trimtab setpoint scale. If we're rolled too much, we want a lower AOA.
+
 unsigned long lastRollTime = 0;
 
 float windAngles[NUM_WIND_READINGS];
 int windIndex = 0;
 int maxI = 0;
 volatile float currentWindAngle = 0;
-bool move_flag = false;
-int targetAngle = -1;
-int startAngle = 0;
-int t_iter = 0;
+
 int light_i = 0;
 
 TaskHandle_t WingLEDTimer;
@@ -179,20 +173,6 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
         
         float currentRoll = doc["roll"].as<float>();
         float currentRollMagnitude = abs(currentRoll)-30; // Don't scale until after 30 degrees roll
-        if(currentRollMagnitude>0.0){
-          trimTabRollScale-=0.1;
-          //don't invert the tab
-          if(trimTabRollScale<0.0){
-            trimTabRollScale = 0.0;
-          }
-        } else {
-          trimTabRollScale += 0.1;
-          if(trimTabRollScale>1.0){
-            trimTabRollScale = 1.0;
-          }
-        }
-        // trimTabRollScale = -0.05*currentRollMagnitude+1; // Inverse linear scaling from 20-40 degrees of roll
-        // trimTabRollScale = min(max(trimTabRollScale, 0.0f), 1.0f); //bound 0->1
       } 
       if (doc.containsKey("clear_winds")){ // used for tacking
         float lastAngle = windAngles[windIndex];
@@ -226,60 +206,6 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
     Serial.printf("[WSc] Received binary data.\n");
     break;
   }
-}
-float moveToProfile(float diff, float curtime) {
-    float A=Amax;
-    float Vm=Vmax;
-    if (diff < 0){
-        A=-Amax;
-        Vm=-Vmax;
-    }
-    float t_accel = Vm/A;
-    float acceldist = 0.5*A*pow(t_accel,2);
-    float halfdiff = diff/2;
-    if (t_accel > abs(halfdiff)) {
-      t_accel = pow((halfdiff/(2*A)),0.5);
-    }
-    acceldist = 0.5*A*pow(t_accel,2);
-    float dist_at_max = diff - 2*acceldist;
-    float  t_decel = t_accel+(dist_at_max/Vm);
-    float t_fin = t_accel+t_decel;
-    if (curtime > t_fin) {
-      return diff;
-    }
-    if (curtime < t_accel) {
-      return 0.5*A*pow(curtime,2);
-    } else if (curtime < t_decel) {
-      return acceldist+Vm*(curtime-t_accel);
-    } else {
-      float dist_at_decel = Vm*(curtime-t_decel)- 0.5*A*pow((curtime-t_decel),2);//x = x0 + vt + at^2
-      return acceldist+ dist_at_max+dist_at_decel;
-    }
-}
-//motion helper function
-void movementHandler(int goal_angle) {
-  if (goal_angle != targetAngle) {
-      move_flag = true;
-      t_iter=0;
-      targetAngle = goal_angle;
-      startAngle = currentAngle;
-    }else{
-      if (move_flag) {
-        Serial.print(currentAngle);
-        Serial.print(" : ");
-        Serial.println(targetAngle);
-        int angleChange = moveToProfile(targetAngle-startAngle, t_iter);
-        currentAngle = angleChange + startAngle;
-        servo.write(currentAngle);
-        Serial.println(currentAngle);
-        t_iter=t_iter+1;
-        if (currentAngle == targetAngle) {
-          Serial.println("DONE");
-          t_iter=0;
-          move_flag = false;
-        }
-      }
-    }
 }
 
 // LED helper functions
@@ -391,13 +317,10 @@ bool lightLED( void *) {
   return true;
 }
 
-bool servoControl();
+
 
 void setup(){
   /* Setting the mode of the pins necessary */
-  pinMode(powerLED, OUTPUT); // Green LED
-  pinMode(bleLED, OUTPUT);   // Blue LED
-  pinMode(errorLED, OUTPUT); // Red LED
   pinMode(potPin, INPUT_PULLDOWN);
 
   // Led setup
@@ -405,20 +328,14 @@ void setup(){
   FastLED.addLeds<LED_TYPE, LED_DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
   FastLED.setBrightness(100);
 
-  /* Set up battery monitoring */
-  //battery.begin(3300, 1.43, &sigmoidal);
   /* Initializing variables to initial conditions */
-  ledState = LOW;                         // LED starts in off position
   control_angle = SERVO_CTR;              // Trim tab starts off centralized
   state = TRIM_STATE_MIN_LIFT; // The state is set to be in the center position or what we consider to be min lift
   Serial.begin(115200);
-  /* Giving feedback that the power is on */
-  digitalWrite(powerLED, HIGH);
+
   /* Initializing the servo and setting it to its initial condition */
   servo.attach(servoPin, 500 , 2500);
-  currentAngle = control_angle;
   Serial.print("Setup Current Angle");
-  Serial.println(currentAngle);
   servo.write(control_angle);
 
   // For recalibration
@@ -510,9 +427,7 @@ void setup(){
   servo.write(SERVO_CTR+5);
   delay(500);
   control_angle = SERVO_CTR;
-  currentAngle = SERVO_CTR;
   Serial.print("Setup Current Angle Post Warmup");
-  Serial.println(currentAngle);
   servo.write(SERVO_CTR);
 
   xTaskCreatePinnedToCore(
@@ -567,7 +482,7 @@ void LEDTimerTask(void * pvParameters){
 
 void ServoTask(void * pvParameters){
   for(;;){
-    servoControl();
+    servoControl(currentWindAngle, state, control_angle);
     //Serial.println("servo task run");
     vTaskDelay(pdMS_TO_TICKS(50));
   }
@@ -584,113 +499,4 @@ void SendData(void * pvParameters){ //actually wind vane but it wouldn't let van
 
 void loop(){
   webSocket.loop();
-}
-
-/**
- * @author Irina Lavryonova
- * @brief Sets the angle of the servo based on the angle of attack read from the encoder at the front
- * @TODO: send this state to the telemetry interface
- */
-
-bool servoControl(){
-  // Read, format, and scale angle of attack reading from the encoder
-  
-  // Serial.println(windAngle);
-
-  // Set debug LEDs to on to indicate servo control is active
-  // digitalWrite(led1Pin, HIGH);
-  // digitalWrite(led2Pin, HIGH);
-
-  // Write servo position to one read from the Arduino
-  //  servo.write(SERVO_CTR + control_angle - 200 - 90);
-  switch (state)
-  {
-  case TRIM_STATE_MAX_LIFT_STBD: {
-      float windAngleInverse = currentWindAngle * -1;
-      unsigned long currentTime = millis();
-      if(currentTime-lastTrimAdjustTime>TRIM_ADJUST_INTERVAL_MS){
-        lastTrimAdjustTime = currentTime;
-        //Serial.print("Current wind: ");
-        //Serial.println(windAngleInverse); 
-        if (MAX_LIFT_ANGLE > windAngleInverse+angle_tolerance)
-        {
-          Serial.println("Increasing angle ");
-          control_angle += 5;
-          if(control_angle>SERVO_HI_LIM){
-            control_angle = SERVO_HI_LIM;
-          }
-        }
-        else if ((MAX_LIFT_ANGLE+angle_tolerance < windAngleInverse))
-        {
-          
-          Serial.println("Decreasing angle ");
-          control_angle -= 5;
-          if(control_angle<SERVO_CTR+10){
-            control_angle = SERVO_CTR+10;
-          }
-        }else{
-          Serial.println("");
-        }
-      }
-      int current_control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
-      // Serial.print("Trimtab roll scale:");
-      // Serial.println(trimTabRollScale);
-
-      // Serial.print("Control angle: ");
-      // Serial.println(control_angle);
-      currentAngle = current_control_angle;
-      servo.write(current_control_angle);
-      //Serial.println("Max lift port");
-    }
-    break; 
-  case TRIM_STATE_MAX_LIFT_PORT: {
-      unsigned long currentTime = millis();
-      if(currentTime-lastTrimAdjustTime>TRIM_ADJUST_INTERVAL_MS){
-        //Serial.print("Max Lift PORT: ");
-        //Serial.println(currentWindAngle); 
-        lastTrimAdjustTime = currentTime;
-        if (MAX_LIFT_ANGLE > currentWindAngle+angle_tolerance)
-        {
-          control_angle -= 5;
-          if(control_angle<SERVO_LO_LIM){
-            control_angle = SERVO_LO_LIM;
-          }
-        }
-        else if ((MAX_LIFT_ANGLE+angle_tolerance < currentWindAngle))
-        {
-          control_angle += 5;
-          if(control_angle>SERVO_CTR-10){
-            control_angle = SERVO_CTR-10;
-          }
-        }
-      }
-      int current_control_angle = min(max(control_angle, (SERVO_CTR - 55)), (SERVO_CTR + 55))*trimTabRollScale;
-      currentAngle = current_control_angle;
-      servo.write(current_control_angle);
-      //Serial.println("Max lift stbd");
-    }
-    break;
-  case TRIM_STATE_MAX_DRAG_STBD:
-    movementHandler(SERVO_LO_LIM*trimTabRollScale);
-    //Serial.println("Max drag port");
-    break;
-  case TRIM_STATE_MAX_DRAG_PORT:
-    movementHandler(SERVO_HI_LIM*trimTabRollScale);
-    //Serial.println("Max drag stbd");
-    break;
-  case TRIM_STATE_MIN_LIFT:
-    movementHandler(SERVO_CTR);
-    //Serial.println("Min lift");
-    break;
-  case TRIM_STATE_MANUAL:
-    state = TRIM_STATE_MANUAL;
-    movementHandler(control_angle);
-    break;
-  default:
-    state = TRIM_STATE_MANUAL; 
-    Serial.println("State: manual");
-    break;
-  }
-
-  return true;
 }

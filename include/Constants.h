@@ -30,6 +30,7 @@ const int SERVO_LO_LIM = 0;
 const int SERVO_HI_LIM = 180;
 const int Amax = 3;
 const int Vmax = 15;
+extern bool move_flag;
 
 /* Wind vane*/ // 
 const int POT_HEADWIND = 0;
@@ -42,10 +43,10 @@ const int MAX_LIFT_ANGLE = 30;
 const int potPin = 32;              //A19
 const int batteryPin = 36;          //Battery V+
 const int servoPin = 15;            //Servo
-const int errorLED = 13;             //red
-const int bleLED = 3;               //blue
-const int powerLED = 5;             //green
 
+enum TRIM_STATE {TRIM_STATE_MIN_LIFT, TRIM_STATE_MAX_DRAG_PORT, TRIM_STATE_MAX_DRAG_STBD, TRIM_STATE_MAX_LIFT_PORT, TRIM_STATE_MAX_LIFT_STBD, TRIM_STATE_MANUAL};
+extern Servo servo; 
+                             // Servo object            // Mapped reading from wind direction sensor on the front of the sail
 #define POT_MAX 890
 #define POT_MIN -830    
 
@@ -63,5 +64,8 @@ void VaneRead(void * pvParameters);
 void LEDTimerTask(void * pvParameters);
 void ServoTask(void * pvParameters);
 void SendData(void * pvParameters);
+bool servoControl(int currentWindAngle, TRIM_STATE state, int control_angle);
+void movementHandler(int goal_angle, int currentAngle);
+float moveToProfile(float diff, float curtime);
 
 #endif
