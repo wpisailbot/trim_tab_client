@@ -37,11 +37,10 @@ const int POT_HEADWIND = 0;
 const int POT_TICKS_PER_DEGREE = 7.34;
 const int angle_tolerance = 5;
 /* State angles */
-const int MAX_LIFT_ANGLE = 30;
+const int MAX_LIFT_ANGLE = 35;
 
 /* Pins */
 const int potPin = 32;              //A19
-const int batteryPin = 36;          //Battery V+
 const int servoPin = 15;            //Servo
 
 enum TRIM_STATE {TRIM_STATE_MIN_LIFT, TRIM_STATE_MAX_DRAG_PORT, TRIM_STATE_MAX_DRAG_STBD, TRIM_STATE_MAX_LIFT_PORT, TRIM_STATE_MAX_LIFT_STBD, TRIM_STATE_MANUAL};

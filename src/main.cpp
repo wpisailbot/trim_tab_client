@@ -208,13 +208,8 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
   }
 }
 
-// LED helper functions
-static int middleIndex() {
-  return NUM_LEDS / 2;
-}
-
 static void setSectionSolid(int sectionIndex, const CRGB &color) {
-  const int mid = middleIndex();
+  const int mid = NUM_LEDS / 2;
   if (sectionIndex < 0 || sectionIndex > 5) {
     return;
   }
