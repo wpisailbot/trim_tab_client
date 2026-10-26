@@ -3,7 +3,7 @@
 bool move_flag = false;
 Servo servo;
 
-bool servoControl(int currentWindAngle, TRIM_STATE state, int control_angle){
+bool servoControl(int currentWindAngle, TRIM_STATE state){
   // Read, format, and scale angle of attack reading from the encoder
   
   // Serial.println(windAngle);

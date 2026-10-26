@@ -477,7 +477,7 @@ void LEDTimerTask(void * pvParameters){
 
 void ServoTask(void * pvParameters){
   for(;;){
-    servoControl(currentWindAngle, state, control_angle);
+    servoControl(currentWindAngle, state);
     //Serial.println("servo task run");
     vTaskDelay(pdMS_TO_TICKS(50));
   }

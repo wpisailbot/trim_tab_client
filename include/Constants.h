@@ -31,10 +31,11 @@ const int SERVO_HI_LIM = 180;
 const int Amax = 3;
 const int Vmax = 15;
 extern bool move_flag;
+extern int control_angle;
 
 /* Wind vane*/ // 
 const int POT_HEADWIND = 0;
-const int POT_TICKS_PER_DEGREE = 7.34;
+const float POT_TICKS_PER_DEGREE = 7.34;
 const int angle_tolerance = 5;
 /* State angles */
 const int MAX_LIFT_ANGLE = 35;
@@ -63,7 +64,7 @@ void VaneRead(void * pvParameters);
 void LEDTimerTask(void * pvParameters);
 void ServoTask(void * pvParameters);
 void SendData(void * pvParameters);
-bool servoControl(int currentWindAngle, TRIM_STATE state, int control_angle);
+bool servoControl(int currentWindAngle, TRIM_STATE state);
 void movementHandler(int goal_angle, int currentAngle);
 float moveToProfile(float diff, float curtime);
 
