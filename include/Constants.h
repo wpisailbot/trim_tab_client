@@ -50,7 +50,7 @@ extern Servo servo;
 #define POT_MAX 890
 #define POT_MIN -830    
 
-#define NUM_WIND_READINGS 20
+#define NUM_WIND_READINGS 5
 
 #define TRIM_ADJUST_INTERVAL_MS 200
 
@@ -67,5 +67,8 @@ void SendData(void * pvParameters);
 bool servoControl(int currentWindAngle, TRIM_STATE state);
 void movementHandler(int goal_angle, int currentAngle);
 float moveToProfile(float diff, float curtime);
+bool lightLED(bool reach_buoy,bool move_flag,bool found_buoy,bool trim_auto,bool rudder_auto,bool connection_status);
+static void setSectionSolid(int sectionIndex, const CRGB &color);
+void LED_setup();
 
 #endif
