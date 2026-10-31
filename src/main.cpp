@@ -16,13 +16,7 @@
 #include "Constants.h"
 
 // WiFi credentials
-const char *ssid = "sailbot_trimtab_ap";
-const char *password = "sailbot123";
-std::string websockets_server_host = "serverip_or_name"; // Enter server adress
-uint16_t websockets_server_port = 8080;             // Enter server port
-WebSocketsClient webSocket;
-
-/* Control variables */
+static WebSocketsClient webSocket;
 
 // Global variables for the Jetson status messages
 bool tailscale_connected = true;
@@ -36,9 +30,6 @@ bool reach_buoy = false;
 int control_angle = 0;                        // The current angle that the servo is set to
 
 TRIM_STATE state;                         // The variable responsible for knowing what state the trim tab is in
-StaticJsonDocument<200> currentData;
-
-unsigned long lastRollTime = 0;
 
 float windAngles[NUM_WIND_READINGS];
 int windIndex = 0;
@@ -46,8 +37,6 @@ int maxI = 0;
 
 TaskHandle_t WingLEDTimer;
 TaskHandle_t ServoController;
-//TaskHandle_t WindVaneRead;
-TaskHandle_t SenData; //actually wind vane but it wouldn't let vane read work
 
 volatile float readWind(){
   static volatile float currentWindAngle = 0;
@@ -65,22 +54,23 @@ volatile float readWind(){
   }
   sum /= maxI;
   currentWindAngle = sum;
-  // Serial.print("Current wind: ");
-  // Serial.println(currentWindAngle);
-  //Serial.println(currentWindAngle);
+  #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_WIND)
+    Serial.println("");
+    Serial.print("Current wind: ");
+    Serial.print(currentWindAngle);
+  #endif
 
   windIndex++;
   windIndex%=NUM_WIND_READINGS-1;
   return currentWindAngle;
 }
 
-float lastTimestamp = 0.0f;
 void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
+  static unsigned long lastRollTime = 0;
   String json_str;
   DynamicJsonDocument doc(1024);
   DeserializationError err;
-  switch (type)
-  {
+  switch (type){
   case WStype_DISCONNECTED:
     Serial.printf("[WSc] Disconnected!\n");
     break;
@@ -94,15 +84,6 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
     if (err){
       Serial.println("deserialization error");
     } else {
-      // if (doc.containsKey("timestamp")){
-      //   float timestamp = doc["timestamp"].as<float>();
-      //   if (timestamp<lastTimestamp){
-      //     Serial.print("Skipping out-of-order command. last timestamp: ");
-      //     Serial.println(lastTimestamp);
-      //     break;
-      //   }
-      //   lastTimestamp = timestamp;
-      // }
       if (doc.containsKey("angle")){
         control_angle = doc["angle"].as<float>();
         if(control_angle > SERVO_HI_LIM){
@@ -110,39 +91,56 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
         } else if (control_angle < SERVO_LO_LIM){
           control_angle = SERVO_LO_LIM;
         }
-        Serial.print("Control angle: ");
-        Serial.print(control_angle);
-        Serial.println("");
+        #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_MANUAL)
+          Serial.print("Control angle: ");
+          Serial.print(control_angle);
+          Serial.println("");
+        #endif
 
-      } if (doc.containsKey("state")){
+      } 
+      if (doc.containsKey("state")){
         String newState = doc["state"].as<String>();
         if (newState == "min_lift"){
           state = TRIM_STATE_MIN_LIFT;
-          Serial.println("State: min_lift");
+          #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_STATE)
+            Serial.println("State: min_lift");
+          #endif
         }
         else if (newState == "max_drag_port"){
           state = TRIM_STATE_MAX_DRAG_PORT;
-          Serial.println("State: max_drag_port");
+          #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_STATE)
+            Serial.println("State: max_drag_port");
+          #endif
         }
         else if (newState == "max_drag_starboard"){
           state = TRIM_STATE_MAX_DRAG_STBD;
-          Serial.println("State: max_drag_starboard");
+          #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_STATE)
+            Serial.println("State: max_drag_starboard");
+          #endif
         }
         else if (newState == "max_lift_port"){
           state = TRIM_STATE_MAX_LIFT_PORT;
-          Serial.println("State: max_lift_port");
+          #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_STATE)
+            Serial.println("State: max_lift_port");
+          #endif
         }
         else if (newState == "max_lift_starboard"){
           state = TRIM_STATE_MAX_LIFT_STBD;
-          Serial.println("State: max_lift_starboard");
+          #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_STATE)
+            Serial.println("State: max_lift_starboard");
+          #endif
         }
         else if (newState == "max_lift_port"){
           state = TRIM_STATE_MAX_LIFT_PORT;
-          Serial.println("State: max_lift_port");
+          #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_STATE)
+            Serial.println("State: max_lift_port");
+          #endif
         }
         else if (newState == "manual"){
           state = TRIM_STATE_MANUAL;
-          Serial.println("State: manual");
+          #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_STATE)
+            Serial.println("State: manual");
+          #endif
         }
       }
       if (doc.containsKey("roll")){
@@ -190,11 +188,11 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
   }
 }
 
-
-
-
-
 void setup(){
+  //wifi
+  static std::string websockets_server_host = SERVER_HOST; // Enter server adress
+  static uint16_t websockets_server_port = SERVER_PORT;
+
   /* Setting the mode of the pins necessary */
   pinMode(potPin, INPUT_PULLDOWN);
 
@@ -245,7 +243,7 @@ void setup(){
   Serial.println("");
 
   // Connect to WiFi
-  WiFi.begin(ssid, password);
+  WiFi.begin(HULL_SSID, PASSWORD);
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);

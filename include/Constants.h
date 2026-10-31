@@ -24,6 +24,12 @@
 #include <ArduinoJson.h>
 #include <FastLED.h>
 
+// WiFi credentials
+#define HULL_SSID "sailbot_trimtab_ap"
+#define PASSWORD "sailbot123"
+#define SERVER_HOST "serverip_or_name"
+#define SERVER_PORT 8000
+
 /* Trim servo */
 const int SERVO_CTR    = 90;
 const int SERVO_LO_LIM = 0;
