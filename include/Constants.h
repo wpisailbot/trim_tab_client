@@ -65,6 +65,14 @@ extern Servo servo;
 #define NUM_LEDS 149
 #define LED_TYPE WS2812B
 #define COLOR_ORDER GRB
+extern bool tailscale_connected;
+extern bool found_buoy;
+extern bool launch_complete;
+extern bool trim_auto;
+extern bool rudder_auto;
+extern bool connection_status;
+extern bool reach_buoy;
+extern CRGB leds[NUM_LEDS];
 
 void VaneRead(void * pvParameters);
 void LEDTimerTask(void * pvParameters);
@@ -73,7 +81,7 @@ void SendData(void * pvParameters);
 bool servoControl(int currentWindAngle, TRIM_STATE state);
 void movementHandler(int goal_angle, int currentAngle);
 float moveToProfile(float diff, float curtime);
-bool lightLED(bool reach_buoy,bool move_flag,bool found_buoy,bool trim_auto,bool rudder_auto,bool connection_status);
+bool lightLED();
 static void setSectionSolid(int sectionIndex, const CRGB &color);
 void LED_setup();
 
