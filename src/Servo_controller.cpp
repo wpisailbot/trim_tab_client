@@ -34,7 +34,7 @@ bool servoControl(int currentWindAngle, TRIM_STATE state){
             control_angle = SERVO_HI_LIM;
           }
         }
-        else if ((MAX_LIFT_ANGLE+angle_tolerance < windAngleInverse))
+        else if ((MAX_LIFT_ANGLE < windAngleInverse))
         {
           
           Serial.println("Decreasing angle ");
@@ -68,7 +68,7 @@ bool servoControl(int currentWindAngle, TRIM_STATE state){
             control_angle = SERVO_LO_LIM;
           }
         }
-        else if ((MAX_LIFT_ANGLE+angle_tolerance < currentWindAngle))
+        else if ((MAX_LIFT_ANGLE < currentWindAngle))
         {
           control_angle += 5;
           if(control_angle>SERVO_CTR-10){

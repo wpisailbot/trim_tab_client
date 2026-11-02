@@ -40,11 +40,11 @@ extern bool move_flag;
 extern int control_angle;
 
 /* Wind vane*/ // 
-const int POT_HEADWIND = 0;
-const float POT_TICKS_PER_DEGREE = 7.34;
+const float POT_TICKS_PER_DEGREE = 8.22;
 const int angle_tolerance = 5;
+#define WIND_OFFSET 20
 /* State angles */
-const int MAX_LIFT_ANGLE = 35;
+const int MAX_LIFT_ANGLE = 15;
 
 /* Pins */
 const int potPin = 32;              //A19

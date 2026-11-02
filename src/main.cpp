@@ -40,7 +40,7 @@ TaskHandle_t ServoController;
 
 volatile float readWind(){
   static volatile float currentWindAngle = 0;
-  float windAngle = analogRead(potPin) / POT_TICKS_PER_DEGREE; //- POT_HEADWIND; // reads angle of attack data and centers values on headwind
+  float windAngle = (analogRead(potPin) / POT_TICKS_PER_DEGREE)+ WIND_OFFSET; //- POT_HEADWIND; // reads angle of attack data and centers values on headwind
   windAngle -= 180; 
 
   //windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
@@ -98,6 +98,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
         #endif
 
       } 
+      #ifndef TRIM_STATE_OVERRIDE
       if (doc.containsKey("state")){
         String newState = doc["state"].as<String>();
         if (newState == "min_lift"){
@@ -130,12 +131,6 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
             Serial.println("State: max_lift_starboard");
           #endif
         }
-        else if (newState == "max_lift_port"){
-          state = TRIM_STATE_MAX_LIFT_PORT;
-          #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_STATE)
-            Serial.println("State: max_lift_port");
-          #endif
-        }
         else if (newState == "manual"){
           state = TRIM_STATE_MANUAL;
           #if defined(MY_DEBUG_MODE) || defined(MY_DEBUG_MODE_STATE)
@@ -143,6 +138,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
           #endif
         }
       }
+      #endif
       if (doc.containsKey("roll")){
         unsigned long current_time = millis();
         //Only take roll data every 500ms
@@ -208,14 +204,7 @@ void setup(){
   servo.attach(servoPin, 500 , 2500);
   Serial.print("Setup Current Angle");
   servo.write(control_angle);
-
-  // For recalibration
-  // while(true){
-  //   float windAngle = analogRead(potPin) - POT_HEADWIND; // reads angle of attack data and centers values on headwind
-  //   windAngle = (((windAngle - POT_MIN) * (180 - -180)) / (POT_MAX - POT_MIN)) + -180;
-  //   Serial.println(windAngle);
-  // }
-
+  
   WiFi.mode(WIFI_STA);
   WiFi.disconnect(); // Disconnect any existing connections
   delay(100); // Short delay after disconnect
@@ -296,8 +285,17 @@ void setup(){
   servo.write(SERVO_CTR+5);
   delay(500);
   control_angle = SERVO_CTR;
-  Serial.print("Setup Current Angle Post Warmup");
+  Serial.println("Setup Current Angle Post Warmup");
   servo.write(SERVO_CTR);
+  #ifdef TRIM_STATE_OVERRIDE
+  Serial.println("TRIM_STATE_MIN_LIFT: 1");
+  Serial.println("TRIM_STATE_MAX_DRAG_PORT: 2");
+  Serial.println("TRIM_STATE_MAX_DRAG_STBD: 3");
+  Serial.println("TRIM_STATE_MAX_LIFT_PORT: 4");
+  Serial.println("TRIM_STATE_MAX_LIFT_STBD: 5");
+  Serial.println("TRIM_STATE_MANUAL: 6");
+  Serial.println("Select state: ");
+  #endif
 
   xTaskCreatePinnedToCore(
     ServoTask,   /* Task function. */
@@ -335,4 +333,26 @@ void ServoTask(void * pvParameters){
 
 void loop(){
   webSocket.loop();
+  #ifdef TRIM_STATE_OVERRIDE
+  static String buffer;
+  while (Serial.available()) {
+      char c = Serial.read();
+
+      if (c == '\n' || c == '\r') {
+          int input_state = buffer.toInt();
+          buffer = "";
+
+          switch (input_state) {
+              case 1: state = TRIM_STATE_MIN_LIFT; break;
+              case 2: state = TRIM_STATE_MAX_DRAG_PORT; break;
+              case 3: state = TRIM_STATE_MAX_DRAG_STBD; break;
+              case 4: state = TRIM_STATE_MAX_LIFT_PORT; break;
+              case 5: state = TRIM_STATE_MAX_LIFT_STBD; break;
+              case 6: state = TRIM_STATE_MANUAL; break;
+          }
+      } else {
+          buffer += c;
+      }
+  }
+  #endif
 }
