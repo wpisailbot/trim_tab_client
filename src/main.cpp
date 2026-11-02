@@ -157,6 +157,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
         int current_control = control_angle-SERVO_CTR;
         control_angle = SERVO_CTR+(current_control*-1.0);
       }
+      #ifndef LED_FLAG_OVERRIDE
       if (doc.containsKey("tailscale")){
         tailscale_connected = doc["tailscale"].as<bool>();
       }
@@ -175,6 +176,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
       if (doc.containsKey("battery_ok")){
         connection_status = doc["battery_ok"].as<bool>();
       }
+      #endif
     }
     break;
   case WStype_BIN:
@@ -184,16 +186,17 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length){
 }
 
 void setup(){
+  #ifndef ENABLE_WIFI
   //wifi
   static std::string websockets_server_host = SERVER_HOST; // Enter server adress
   static uint16_t websockets_server_port = SERVER_PORT;
+  #endif
 
   /* Setting the mode of the pins necessary */
   pinMode(potPin, INPUT_PULLDOWN);
 
   // Led setup
   LED_setup();
-
   /* Initializing variables to initial conditions */
   control_angle = SERVO_CTR;              // Trim tab starts off centralized
   state = TRIM_STATE_MIN_LIFT; // The state is set to be in the center position or what we consider to be min lift
@@ -204,6 +207,7 @@ void setup(){
   Serial.print("Setup Current Angle");
   servo.write(control_angle);
   
+  #ifndef ENABLE_WIFI
   WiFi.mode(WIFI_STA);
   WiFi.disconnect(); // Disconnect any existing connections
   delay(100); // Short delay after disconnect
@@ -277,6 +281,7 @@ void setup(){
   webSocket.begin(websockets_server_host.c_str(), websockets_server_port);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
+  #endif 
 
   Serial.println("moving servo");
   servo.write(SERVO_CTR+1);
@@ -286,6 +291,7 @@ void setup(){
   control_angle = SERVO_CTR;
   Serial.println("Setup Current Angle Post Warmup");
   servo.write(SERVO_CTR);
+  #if defined(TRIM_STATE_OVERRIDE) || defined(LED_FLAG_OVERRIDE)
   #ifdef TRIM_STATE_OVERRIDE
   Serial.println("TRIM_STATE_MIN_LIFT: 1");
   Serial.println("TRIM_STATE_MAX_DRAG_PORT: 2");
@@ -294,6 +300,16 @@ void setup(){
   Serial.println("TRIM_STATE_MAX_LIFT_STBD: 5");
   Serial.println("TRIM_STATE_MANUAL: 6");
   Serial.println("Select state: ");
+  #endif
+  #ifdef LED_FLAG_OVERRIDE
+  Serial.println("reach_buoy: 7");
+  Serial.println("move_flag: 8");
+  Serial.println("found_buoy: 9");
+  Serial.println("trim_auto: 10");
+  Serial.println("rudder_auto: 11");
+  Serial.println("connection_status: 12");
+  Serial.println("Select state: ");
+  #endif
   #endif
 
   xTaskCreatePinnedToCore(
@@ -318,7 +334,7 @@ void LEDTimerTask(void * pvParameters){
   for(;;){
     //Serial.println("websocket run");
     lightLED(reach_buoy,move_flag,found_buoy,trim_auto,rudder_auto,connection_status);
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
@@ -332,7 +348,7 @@ void ServoTask(void * pvParameters){
 
 void loop(){
   webSocket.loop();
-  #ifdef TRIM_STATE_OVERRIDE
+  #if defined(TRIM_STATE_OVERRIDE) || defined(LED_FLAG_OVERRIDE)
   static String buffer;
   while (Serial.available()) {
       char c = Serial.read();
@@ -342,12 +358,22 @@ void loop(){
           buffer = "";
 
           switch (input_state) {
+              #ifdef TRIM_STATE_OVERRIDE
               case 1: state = TRIM_STATE_MIN_LIFT; break;
               case 2: state = TRIM_STATE_MAX_DRAG_PORT; break;
               case 3: state = TRIM_STATE_MAX_DRAG_STBD; break;
               case 4: state = TRIM_STATE_MAX_LIFT_PORT; break;
               case 5: state = TRIM_STATE_MAX_LIFT_STBD; break;
               case 6: state = TRIM_STATE_MANUAL; break;
+              #endif
+              #ifdef LED_FLAG_OVERRIDE
+              case 7: reach_buoy = !reach_buoy; break;
+              case 8: move_flag = !move_flag; break;
+              case 9: found_buoy = !found_buoy; break;
+              case 10: trim_auto = !trim_auto; break;
+              case 11: rudder_auto = !rudder_auto; break;
+              case 12: connection_status = !connection_status; break;
+              #endif
           }
       } else {
           buffer += c;
